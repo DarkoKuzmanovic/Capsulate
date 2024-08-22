@@ -1,6 +1,6 @@
 # Capsulate
 
-Capsulate 0.1.0 is an AutoHotkey script that enhances the functionality of the Caps Lock key on Windows systems. It allows users to repurpose the Caps Lock key for various custom actions while still maintaining the ability to toggle caps lock.
+Capsulate 0.2.0 is an AutoHotkey script that enhances the functionality of the Caps Lock key on Windows systems. It allows users to repurpose the Caps Lock key for various custom actions while still maintaining the ability to toggle caps lock.
 
 ## Overview
 
