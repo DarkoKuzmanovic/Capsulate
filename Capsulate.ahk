@@ -6,6 +6,7 @@ config := LoadConfiguration()
 CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
 DOUBLE_CLICK_COUNT := config["DoubleClickCount"]
 TOOLTIP_POSITION := config["ToolTipPosition"]
+DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
 
 global capsLockPressed := false
 global waitingForChord := false
@@ -38,7 +39,7 @@ trayMenu.Disable("Capsulate v" . SCRIPT_VERSION)
 trayMenu.Add()
 trayMenu.Add("Run at Startup", (*) => ToggleStartup())
 trayMenu.Add()
-trayMenu.Add("Configuration", (*) => ShowUnifiedConfigGUI())
+trayMenu.Add("Configuration`tCapsLock+Alt+C", (*) => ShowUnifiedConfigGUI())
 trayMenu.Add("Exit", (*) => ExitApp())
 
 SetTimer SetTrayIcon, 5000
@@ -57,7 +58,7 @@ SetTimer SetTrayIcon, 5000
     if (elapsedTime < CAPS_LOCK_TIMEOUT) {
         capsLockCount++
         if (capsLockCount = DOUBLE_CLICK_COUNT) {
-            SendInput "{LWin down}{F5}{LWin up}"
+            SendInput DOUBLE_CLICK_ACTION
             capsLockCount := 0
         } else {
             SetTimer () => (capsLockCount := 0), -CAPS_LOCK_TIMEOUT
@@ -72,6 +73,7 @@ SetTimer SetTrayIcon, 5000
 ^CapsLock:: SetCapsLockState GetKeyState("CapsLock", "T") ? "AlwaysOff" : "AlwaysOn"
 
 #HotIf capsLockPressed
+!c::ShowUnifiedConfigGUI()
 Esc::TogglePomodoro()
 Up::SendInput "{Volume_Up}"
 Down::SendInput "{Volume_Down}"
@@ -101,7 +103,6 @@ S::{
 }
 #HotIf
 
-^!c::ShowUnifiedConfigGUI()
 
 ExpandText() {
     word := GetWordAtCursor()
@@ -136,10 +137,8 @@ ShowUnifiedConfigGUI() {
     
     configGui := Gui(, "Capsulate Configuration")
     
-    ; Create tabs
-    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander"])
+    tabs := configGui.Add("Tab3", "w400 h300", ["General", "Text Expander"])
     
-    ; General Settings Tab
     tabs.UseTab(1)
     configGui.Add("Text", "x20 y40 w150", "Caps Lock Timeout:")
     timeoutEdit := configGui.Add("Edit", "x170 y40 w50", config["CapsLockTimeout"])
@@ -151,7 +150,9 @@ ShowUnifiedConfigGUI() {
     tooltipPositionDropdown := configGui.Add("DropDownList", "vTooltipPosition x170 y100 w100", ["Near Mouse", "Near Tray"])
     tooltipPositionDropdown.Choose(config["ToolTipPosition"] = 1 ? "Near Mouse" : "Near Tray")
     
-    ; Text Expander Tab
+    configGui.Add("Text", "x20 y130 w150", "Double Click Action:")
+    doubleClickActionEdit := configGui.Add("Edit", "x170 y130 w200", config["DoubleClickAction"])
+    
     tabs.UseTab(2)
     configGui.Add("Text", "x20 y40", "Abbreviation:")
     abbrevEdit := configGui.Add("Edit", "x20 y60 w100")
@@ -164,29 +165,31 @@ ShowUnifiedConfigGUI() {
     configGui.Add("Button", "x20 y290 w100", "Add/Update").OnEvent("Click", (*) => SaveExpansion(abbrevEdit, expansionEdit, lv))
     configGui.Add("Button", "x130 y290 w100", "Delete").OnEvent("Click", (*) => DeleteExpansion(lv))
     
-    ; Move common buttons outside of tabs
-    tabs.UseTab()  ; This line deselects the tab, allowing us to add controls outside the tab area
-    configGui.Add("Button", "x20 y410 w100", "Save").OnEvent("Click", (*) => SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown))
-    configGui.Add("Button", "x130 y410 w100", "Cancel").OnEvent("Click", (*) => configGui.Destroy())
+    tabs.UseTab()
+    configGui.Add("Button", "x20 y310 w100", "Save").OnEvent("Click", (*) => SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown, doubleClickActionEdit))
+    configGui.Add("Button", "x130 y310 w100", "Cancel").OnEvent("Click", (*) => configGui.Destroy())
     
     configGui.Show()
 }
 
-SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown) {
-    global config, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT, TOOLTIP_POSITION
+SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown, doubleClickActionEdit) {
+    global config, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT, TOOLTIP_POSITION, DOUBLE_CLICK_ACTION
     
     config["CapsLockTimeout"] := timeoutEdit.Value
     config["DoubleClickCount"] := doubleClickCountEdit.Value
     config["ToolTipPosition"] := tooltipPositionDropdown.Value = "Near Mouse" ? 1 : 0
+    config["DoubleClickAction"] := doubleClickActionEdit.Value
     
     CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
     DOUBLE_CLICK_COUNT := config["DoubleClickCount"]
     TOOLTIP_POSITION := config["ToolTipPosition"]
+    DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
     
     configFile := A_ScriptDir . "\config.ini"
     IniWrite config["CapsLockTimeout"], configFile, "General", "CapsLockTimeout"
     IniWrite config["DoubleClickCount"], configFile, "General", "DoubleClickCount"
     IniWrite config["ToolTipPosition"], configFile, "General", "ToolTipPosition"
+    IniWrite config["DoubleClickAction"], configFile, "General", "DoubleClickAction"
     
     configGui.Destroy()
     ShowTooltip("Configuration saved successfully!")
@@ -247,6 +250,9 @@ LoadConfiguration() {
     config["CapsLockTimeout"] := IniRead(configFile, "General", "CapsLockTimeout", 300)
     config["DoubleClickCount"] := IniRead(configFile, "General", "DoubleClickCount", 2)
     config["ToolTipPosition"] := IniRead(configFile, "General", "ToolTipPosition", 1)
+    config["DoubleClickAction"] := IniRead(configFile, "General", "DoubleClickAction", "{LWin down}{F5}{LWin up}")
+    
+    DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
     
     return config
 }
