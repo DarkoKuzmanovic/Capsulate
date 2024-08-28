@@ -73,6 +73,16 @@ SetTimer SetTrayIcon, 5000
 ^CapsLock:: SetCapsLockState GetKeyState("CapsLock", "T") ? "AlwaysOff" : "AlwaysOn"
 
 #HotIf capsLockPressed
+1::LaunchShortcut("1")
+2::LaunchShortcut("2")
+3::LaunchShortcut("3")
+4::LaunchShortcut("4")
+5::LaunchShortcut("5")
+6::LaunchShortcut("6")
+7::LaunchShortcut("7")
+8::LaunchShortcut("8")
+9::LaunchShortcut("9")
+0::LaunchShortcut("0")
 !c::ShowUnifiedConfigGUI()
 Esc::TogglePomodoro()
 Up::SendInput "{Volume_Up}"
@@ -103,6 +113,12 @@ S::{
 }
 #HotIf
 
+LaunchShortcut(key) {
+    path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
+    if (path != "") {
+        Run(path)
+    }
+}
 
 ExpandText() {
     word := GetWordAtCursor()
@@ -136,8 +152,9 @@ ShowUnifiedConfigGUI() {
     global config
     
     configGui := Gui(, "Capsulate Configuration")
+    configGui.SetFont("s9", "Segoe UI")  ; Set Segoe UI as the default font
     
-    tabs := configGui.Add("Tab3", "w400 h300", ["General", "Text Expander"])
+    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander", "Shortcuts"])
     
     tabs.UseTab(1)
     configGui.Add("Text", "x20 y40 w150", "Caps Lock Timeout:")
@@ -159,15 +176,27 @@ ShowUnifiedConfigGUI() {
     configGui.Add("Text", "x20 y90", "Expansion:")
     expansionEdit := configGui.Add("Edit", "x20 y110 w200 h60")
     
-    lv := configGui.Add("ListView", "x20 y180 w360 h100", ["Abbreviation", "Expansion"])
+    lv := configGui.Add("ListView", "x20 y180 w360 h150", ["Abbreviation", "Expansion"])
     PopulateExpansionsList(lv)
     
-    configGui.Add("Button", "x20 y290 w100", "Add/Update").OnEvent("Click", (*) => SaveExpansion(abbrevEdit, expansionEdit, lv))
-    configGui.Add("Button", "x130 y290 w100", "Delete").OnEvent("Click", (*) => DeleteExpansion(lv))
+    configGui.Add("Button", "x20 y340 w100", "Add/Update").OnEvent("Click", (*) => SaveExpansion(abbrevEdit, expansionEdit, lv))
+    configGui.Add("Button", "x130 y340 w100", "Delete").OnEvent("Click", (*) => DeleteExpansion(lv))
+
+    tabs.UseTab(3)
+    configGui.Add("Text", "x20 y40 w150", "Select a number key:")
+    shortcutKeyDropdown := configGui.Add("DropDownList", "x170 y40 w50", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
+    configGui.Add("Text", "x20 y70 w150", "Executable or folder path:")
+    shortcutPathEdit := configGui.Add("Edit", "x170 y70 w180")
+    configGui.Add("Button", "x360 y70 w30", "...").OnEvent("Click", (*) => BrowseExe(shortcutPathEdit))
+    configGui.Add("Button", "x170 y100 w100", "Set Shortcut").OnEvent("Click", (*) => SetShortcut(shortcutKeyDropdown, shortcutPathEdit))
     
+    global shortcutListView
+    shortcutListView := configGui.Add("ListView", "x20 y130 w360 h230", ["Key", "Path"])
+    PopulateShortcutList(shortcutListView)
+
     tabs.UseTab()
-    configGui.Add("Button", "x20 y310 w100", "Save").OnEvent("Click", (*) => SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown, doubleClickActionEdit))
-    configGui.Add("Button", "x130 y310 w100", "Cancel").OnEvent("Click", (*) => configGui.Destroy())
+    configGui.Add("Button", "x20 y410 w100", "Save").OnEvent("Click", (*) => SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown, doubleClickActionEdit))
+    configGui.Add("Button", "x130 y410 w100", "Cancel").OnEvent("Click", (*) => configGui.Destroy())
     
     configGui.Show()
 }
@@ -191,10 +220,18 @@ SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionD
     IniWrite config["ToolTipPosition"], configFile, "General", "ToolTipPosition"
     IniWrite config["DoubleClickAction"], configFile, "General", "DoubleClickAction"
     
+    ; Save shortcuts
+    Loop 10 {
+        key := A_Index - 1
+        path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
+        if (path != "") {
+            IniWrite(path, configFile, "Shortcuts", key)
+        }
+    }
+    
     configGui.Destroy()
     ShowTooltip("Configuration saved successfully!")
 }
-
 PopulateExpansionsList(lv) {
     lv.Delete()
     expansionsFile := A_ScriptDir . "\expansions.ini"
@@ -338,5 +375,34 @@ PomodoroTick() {
         SetTimer PomodoroTick, 0
         ShowTooltip("Pomodoro finished!")
         SoundPlay "*-1"  ; Play a system sound
+    }
+}
+
+BrowseExe(pathEdit) {
+    selectedFile := FileSelect("3", , "Select an executable", "Executables (*.exe)")
+    if (selectedFile != "") {
+        pathEdit.Value := selectedFile
+    }
+}
+
+
+SetShortcut(keyDropdown, pathEdit) {
+    key := keyDropdown.Text
+    path := pathEdit.Value
+    if (key != "" and path != "") {
+        IniWrite(path, A_ScriptDir . "\config.ini", "Shortcuts", key)
+        PopulateShortcutList(shortcutListView)
+        ShowTooltip("Shortcut set successfully!")
+    }
+}
+
+PopulateShortcutList(listView) {
+    listView.Delete()
+    Loop 10 {
+        key := A_Index - 1
+        path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
+        if (path != "") {
+            listView.Add(, key, path)
+        }
     }
 }
