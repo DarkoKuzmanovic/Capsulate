@@ -52,21 +52,34 @@ SetTimer SetTrayIcon, 5000
 
 *CapsLock up:: {
     global capsLockPressed, capsLockTimer, capsLockCount, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT
+    
+    ; Reset the CapsLock pressed state
     capsLockPressed := false
+    
+    ; Calculate the time elapsed since the last CapsLock press
     elapsedTime := A_TickCount - capsLockTimer
     
+    ; Check if the elapsed time is within the timeout threshold
     if (elapsedTime < CAPS_LOCK_TIMEOUT) {
+        ; Increment the CapsLock press count
         capsLockCount++
+        
+        ; Check if the double-click count has been reached
         if (capsLockCount = DOUBLE_CLICK_COUNT) {
+            ; Perform the double-click action
             SendInput DOUBLE_CLICK_ACTION
+            ; Reset the CapsLock press count
             capsLockCount := 0
         } else {
+            ; Set a timer to reset the CapsLock press count after the timeout
             SetTimer () => (capsLockCount := 0), -CAPS_LOCK_TIMEOUT
         }
     } else {
+        ; If the elapsed time is greater than the timeout, reset the count to 1
         capsLockCount := 1
     }
     
+    ; Update the timer for the last CapsLock press
     capsLockTimer := A_TickCount
 }
 
@@ -105,11 +118,44 @@ K::
 #HotIf
 
 #HotIf waitingForChord
-S::{
+L::
+{
     global waitingForChord
     waitingForChord := false
     ToolTip
-    ; TakeScreenshot() function call removed
+    ConvertCase("lower")
+}
+
+U::
+{
+    global waitingForChord
+    waitingForChord := false
+    ToolTip
+    ConvertCase("upper")
+}
+
+C::
+{
+    global waitingForChord
+    waitingForChord := false
+    ToolTip
+    ConvertCase("camel")
+}
+
+T::
+{
+    global waitingForChord
+    waitingForChord := false
+    ToolTip
+    ConvertCase("title")
+}
+
+Space::
+{
+    global waitingForChord
+    waitingForChord := false
+    ToolTip
+    ConvertCase("trim")
 }
 #HotIf
 
@@ -405,4 +451,73 @@ PopulateShortcutList(listView) {
             listView.Add(, key, path)
         }
     }
+}
+
+ConvertCase(caseType) {
+    savedClipboard := ClipboardAll()
+    A_Clipboard := ""
+    Send "^c"
+    if !ClipWait(0.5)
+    {
+        ShowTooltip("No text selected")
+        return
+    }
+    
+    text := A_Clipboard
+    
+    if (text = "") {
+        ShowTooltip("Selected text is empty")
+        return
+    }
+    
+    convertedText := ""
+    switch caseType {
+        case "lower":
+            convertedText := StrLower(text)
+        case "upper":
+            convertedText := StrUpper(text)
+        case "camel":
+            convertedText := ToCamelCase(text)
+        case "title":
+            convertedText := ToTitleCase(text)
+        case "trim":
+            convertedText := Trim(text)
+    }
+    
+    if (convertedText != "") {
+        A_Clipboard := convertedText
+        Send "^v"
+        ShowTooltip("Text converted to " . caseType)
+    } else {
+        ShowTooltip("Failed to convert text")
+    }
+    
+    Sleep 100  ; Give some time for the paste operation
+    A_Clipboard := savedClipboard
+}
+
+ToCamelCase(str) {
+    result := ""
+    nextUpper := false
+    Loop Parse, str
+    {
+        if (A_LoopField = " " or A_LoopField = "_" or A_LoopField = "-")
+        {
+            nextUpper := true
+        }
+        else if (nextUpper)
+        {
+            result .= StrUpper(A_LoopField)
+            nextUpper := false
+        }
+        else
+        {
+            result .= StrLower(A_LoopField)
+        }
+    }
+    return result
+}
+
+ToTitleCase(str) {
+    return StrTitle(str)
 }
