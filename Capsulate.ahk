@@ -1,7 +1,6 @@
 ﻿#Requires AutoHotkey v2.0
 SCRIPT_VERSION := "0.3.0"
 
-
 config := LoadConfiguration()
 CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
 DOUBLE_CLICK_COUNT := config["DoubleClickCount"]
