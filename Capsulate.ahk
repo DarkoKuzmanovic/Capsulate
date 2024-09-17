@@ -105,6 +105,7 @@ Right::Send "#^{Right}"
 T::Run "taskmgr"
 W::Run "ms-settings:windowsupdate"
 C::Run "*RunAs cleanmgr"
+X::RestartXMouseButtonControl()
 E::ExpandText()
 P::GeneratePassword()
 K::
@@ -519,4 +520,10 @@ ToCamelCase(str) {
 
 ToTitleCase(str) {
     return StrTitle(str)
+}
+
+RestartXMouseButtonControl() {
+    ProcessClose("XMouseButtonControl.exe")
+    Run("XMouseButtonControl.exe")
+    ShowTooltip("XMouseButtonControl restarted")
 }
