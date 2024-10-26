@@ -1,5 +1,6 @@
 ﻿#Requires AutoHotkey v2.0
-SCRIPT_VERSION := "0.3.0"
+#SingleInstance Force
+SCRIPT_VERSION := "0.5.0"
 
 config := LoadConfiguration()
 CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
@@ -17,7 +18,6 @@ capsLockCount := 0
 SetCapsLockState "AlwaysOff"
 
 SetTrayIcon() {
-
     iconFile := IsWindowsDarkTheme()
         ? A_ScriptDir . "\capsulate-dark.png"
         : A_ScriptDir . "\capsulate-light.png"
@@ -37,12 +37,18 @@ trayMenu.Delete()
 trayMenu.Add("Capsulate v" . SCRIPT_VERSION, (*) => {})
 trayMenu.Disable("Capsulate v" . SCRIPT_VERSION)
 trayMenu.Add()
+trayMenu.Add("Check for Updates", CheckForUpdates)  ; Add this line
 trayMenu.Add("Run at Startup", (*) => ToggleStartup())
 trayMenu.Add()
 trayMenu.Add("Configuration`tCapsLock+Alt+C", (*) => ShowUnifiedConfigGUI())
+
 trayMenu.Add("Exit", (*) => ExitApp())
 
 SetTimer SetTrayIcon, 5000
+
+if (CheckLatestVersion()) {
+    ShowTooltip("A new version is available!")
+}
 
 *CapsLock:: {
     global capsLockPressed
@@ -131,7 +137,6 @@ K::
     SendInput "TRACKING REFERENCE: "
     A_Clipboard := trackingCode
     SendInput "^v"
-    SendInput "{BackSpace}"
     SendInput "^a"
     SendInput "^b"
     SendInput "{Right}"
@@ -253,8 +258,7 @@ ShowUnifiedConfigGUI() {
     configGui := Gui(, "Capsulate Configuration")
     configGui.SetFont("s9", "Segoe UI")  ; Set Segoe UI as the default font
 
-    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander", "Shortcuts"
-    ])
+    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander", "Shortcuts"])
 
     tabs.UseTab(1)
     configGui.Add("Text", "x20 y40 w150", "Caps Lock Timeout:")
@@ -265,8 +269,7 @@ ShowUnifiedConfigGUI() {
 
     configGui.Add("Text", "x20 y100 w150", "Tooltip Position:")
     tooltipPositionDropdown := configGui.Add("DropDownList", "vTooltipPosition x170 y100 w100", ["Near Mouse",
-        "Near Tray"
-    ])
+        "Near Tray"])
     tooltipPositionDropdown.Choose(config["ToolTipPosition"] = 1 ? "Near Mouse" : "Near Tray")
 
     configGui.Add("Text", "x20 y130 w150", "Double Click Action:")
@@ -278,8 +281,7 @@ ShowUnifiedConfigGUI() {
     configGui.Add("Text", "x20 y90", "Expansion:")
     expansionEdit := configGui.Add("Edit", "x20 y110 w200 h60")
 
-    lv := configGui.Add("ListView", "x20 y180 w360 h150", ["Abbreviation", "Expansion"
-    ])
+    lv := configGui.Add("ListView", "x20 y180 w360 h150", ["Abbreviation", "Expansion"])
     PopulateExpansionsList(lv)
 
     configGui.Add("Button", "x20 y340 w100", "Add/Update").OnEvent("Click", (*) => SaveExpansion(abbrevEdit,
@@ -289,8 +291,7 @@ ShowUnifiedConfigGUI() {
     tabs.UseTab(3)
     configGui.Add("Text", "x20 y40 w150", "Select a number key:")
     shortcutKeyDropdown := configGui.Add("DropDownList", "x170 y40 w50", ["1", "2", "3", "4", "5", "6", "7", "8", "9",
-        "0"
-    ])
+        "0"])
     configGui.Add("Text", "x20 y70 w150", "Executable or folder path:")
     shortcutPathEdit := configGui.Add("Edit", "x170 y70 w180")
     configGui.Add("Button", "x360 y70 w30", "...").OnEvent("Click", (*) => BrowseExe(shortcutPathEdit))
@@ -298,8 +299,7 @@ ShowUnifiedConfigGUI() {
         shortcutPathEdit))
 
     global shortcutListView
-    shortcutListView := configGui.Add("ListView", "x20 y130 w360 h230", ["Key", "Path"
-    ])
+    shortcutListView := configGui.Add("ListView", "x20 y130 w360 h230", ["Key", "Path"])
     PopulateShortcutList(shortcutListView)
 
     tabs.UseTab()
@@ -413,15 +413,56 @@ CreateDefaultConfig(configFile) {
 }
 
 ShowTooltip(text) {
-    if (TOOLTIP_POSITION = 1) {
-        ToolTip text
+    static tooltipGui := 0
+
+    if (!tooltipGui) {
+        tooltipGui := Gui("+AlwaysOnTop -Caption +ToolWindow")
+        tooltipGui.BackColor := "0x202020"
+        tooltipGui.Opt("+E0x20")
+
+        tooltipGui.MarginX := 16
+        tooltipGui.MarginY := 12
+        tooltipGui.SetFont("s10 cWhite", "Segoe UI")
+        tooltipGui.Add("Text", "vTooltipText", text)
     } else {
-        CoordMode "ToolTip", "Screen"
-        trayX := A_ScreenWidth - 20
-        trayY := A_ScreenHeight - 20
-        ToolTip text, trayX, trayY
+        tooltipGui["TooltipText"].Value := text
     }
-    SetTimer () => ToolTip(), -2000  ; Hide tooltip after 2 seconds
+
+    if (TOOLTIP_POSITION = 1) {
+        MouseGetPos(&mouseX, &mouseY)
+        xPos := mouseX + 10
+        yPos := mouseY + 10
+    } else {
+        xPos := A_ScreenWidth - 250
+        yPos := A_ScreenHeight - 100
+    }
+
+    tooltipGui.Show(Format("x{} y{} AutoSize", xPos, yPos))
+    SetTimer () => tooltipGui.Hide(), -2000
+}
+
+ShowPomodoroTooltip(text) {
+    static pomodoroGui := 0
+
+    if (!pomodoroGui) {
+        pomodoroGui := Gui("+AlwaysOnTop -Caption +ToolWindow")
+        pomodoroGui.BackColor := "0x1a472a"
+        pomodoroGui.Opt("+E0x20")  ; Click-through enabled
+        pomodoroGui.Opt("+E0x80000")  ; Layered window for transparency
+
+        pomodoroGui.MarginX := 16
+        pomodoroGui.MarginY := 12
+        pomodoroGui.SetFont("s10 cWhite", "Segoe UI")
+        pomodoroGui.Add("Text", "vPomodoroText", text)
+    } else {
+        pomodoroGui["PomodoroText"].Value := text
+    }
+
+    xPos := A_ScreenWidth - 250
+    yPos := A_ScreenHeight - 100
+
+    pomodoroGui.Show(Format("x{} y{} AutoSize", xPos, yPos))
+    WinSetTransparent(180, pomodoroGui)
 }
 
 ToggleStartup() {
@@ -463,7 +504,7 @@ TogglePomodoro() {
         pomodoroActive := true
         pomodoroTimer := 25 * 60  ; 25 minutes in seconds
         SetTimer PomodoroTick, 1000
-        ShowTooltip("Pomodoro started: 25:00")
+        ShowPomodoroTooltip("Pomodoro started: 25:00")
     } else {
         pomodoroActive := false
         SetTimer PomodoroTick, 0
@@ -478,11 +519,11 @@ PomodoroTick() {
         pomodoroTimer--
         minutes := Floor(pomodoroTimer / 60)
         seconds := Mod(pomodoroTimer, 60)
-        ShowTooltip("Pomodoro: " . Format("{:02d}:{:02d}", minutes, seconds))
+        ShowPomodoroTooltip(Format("{:02d}:{:02d}", minutes, seconds))
     } else {
         SetTimer PomodoroTick, 0
         ShowTooltip("Pomodoro finished!")
-        SoundPlay "*-1"  ; Play a system sound
+        SoundPlay "*-1"
     }
 }
 
@@ -582,4 +623,54 @@ RestartXMouseButtonControl() {
     ProcessClose("XMouseButtonControl.exe")
     Run("XMouseButtonControl.exe")
     ShowTooltip("XMouseButtonControl restarted")
+}
+
+CheckLatestVersion() {
+    try {
+        whr := ComObject("WinHttp.WinHttpRequest.5.1")
+        whr.Open("GET", "https://api.github.com/repos/DarkoKuzmanovic/capsulate/releases/latest", true)
+        whr.Send()
+        whr.WaitForResponse()
+        response := whr.ResponseText
+        latestVersion := JSON.Parse(response).tag_name
+
+        if (latestVersion != SCRIPT_VERSION) {
+            return true
+        }
+    }
+    return false
+}
+
+UpdateScript() {
+    try {
+        ; Download new version
+        Download("https://github.com/DarkoKuzmanovic/capsulate/releases/latest/download/Capsulate.ahk", A_ScriptDir .
+            "\Capsulate_new.ahk")
+
+        ; Create update batch script
+        updateScript := '
+        (
+        @echo off
+        timeout /t 1 /nobreak
+        del "' . A_ScriptFullPath . '"
+        move "' . A_ScriptDir . '\Capsulate_new.ahk" "' . A_ScriptFullPath . '"
+        start "" "' . A_ScriptFullPath . '"
+        del "%~f0"
+        )'
+
+        FileAppend(updateScript, A_ScriptDir . "\update.bat")
+        Run(A_ScriptDir . "\update.bat", , "Hide")
+        ExitApp
+    }
+}
+
+CheckForUpdates(*) {
+    if (CheckLatestVersion()) {
+        result := MsgBox("A new version is available. Update now?", "Update Available", "YesNo")
+        if (result = "Yes") {
+            UpdateScript()
+        }
+    } else {
+        ShowTooltip("You have the latest version!")
+    }
 }
