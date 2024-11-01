@@ -37,7 +37,7 @@ trayMenu.Delete()
 trayMenu.Add("Capsulate v" . SCRIPT_VERSION, (*) => {})
 trayMenu.Disable("Capsulate v" . SCRIPT_VERSION)
 trayMenu.Add()
-trayMenu.Add("Check for Updates", CheckForUpdates)  ; Add this line
+trayMenu.Add("Check for Updates", CheckForUpdates)
 trayMenu.Add("Run at Startup", (*) => ToggleStartup())
 trayMenu.Add()
 trayMenu.Add("Configuration`tCapsLock+Alt+C", (*) => ShowUnifiedConfigGUI())
@@ -102,10 +102,7 @@ if (CheckLatestVersion()) {
 8:: LaunchShortcut("8")
 9:: LaunchShortcut("9")
 0:: LaunchShortcut("0")
-[:: CopyToVariable("trackingCode")
-]:: CopyToVariable("orderNumber")
 !c:: ShowUnifiedConfigGUI()
-Esc:: TogglePomodoro()
 Up:: SendInput "{Volume_Up}"
 Down:: SendInput "{Volume_Down}"
 Delete:: SendInput "{Volume_Mute}"
@@ -125,39 +122,6 @@ K::
     SetTimer () => ToolTip(), -2000  ; Hide tooltip after 2 seconds
 }
 #HotIf
-
-#HotIf waitingForChord
-1::
-{
-    global waitingForChord, trackingCode, orderNumber
-    waitingForChord := false
-    ToolTip
-
-    ; Handle tracking reference
-    SendInput "TRACKING REFERENCE: "
-    A_Clipboard := trackingCode
-    SendInput "^v"
-    SendInput "^a"
-    SendInput "^b"
-    SendInput "{Right}"
-
-    ; Wait 2000ms
-    Sleep 2000
-
-    ; Handle order number (similar to Chord 2)
-    SendInput "!u"
-    Sleep 200
-    SendInput "{Down}"
-    Sleep 100
-    SendInput "{Right}"
-    Sleep 100
-    SendInput "{Down}"
-    Sleep 100
-    SendInput "{Enter}"
-
-    ; Place orderNumber in clipboard
-    A_Clipboard := orderNumber
-}
 
 #HotIf waitingForChord
 L::
@@ -200,12 +164,6 @@ Space::
     ConvertCase("trim")
 }
 #HotIf
-
-CopyToVariable(varName) {
-    global
-    %varName% := GetSelectedText()
-    ShowTooltip("Copied to " . varName)
-}
 
 GetSelectedText() {
     savedClipboard := ClipboardAll()
@@ -441,30 +399,6 @@ ShowTooltip(text) {
     SetTimer () => tooltipGui.Hide(), -2000
 }
 
-ShowPomodoroTooltip(text) {
-    static pomodoroGui := 0
-
-    if (!pomodoroGui) {
-        pomodoroGui := Gui("+AlwaysOnTop -Caption +ToolWindow")
-        pomodoroGui.BackColor := "0x1a472a"
-        pomodoroGui.Opt("+E0x20")  ; Click-through enabled
-        pomodoroGui.Opt("+E0x80000")  ; Layered window for transparency
-
-        pomodoroGui.MarginX := 16
-        pomodoroGui.MarginY := 12
-        pomodoroGui.SetFont("s10 cWhite", "Segoe UI")
-        pomodoroGui.Add("Text", "vPomodoroText", text)
-    } else {
-        pomodoroGui["PomodoroText"].Value := text
-    }
-
-    xPos := A_ScreenWidth - 250
-    yPos := A_ScreenHeight - 100
-
-    pomodoroGui.Show(Format("x{} y{} AutoSize", xPos, yPos))
-    WinSetTransparent(180, pomodoroGui)
-}
-
 ToggleStartup() {
     startupFolder := A_Startup . "\Capsulate.lnk"
     if (FileExist(startupFolder)) {
@@ -491,40 +425,6 @@ GeneratePassword() {
     }
     A_Clipboard := password
     ShowTooltip("Password generated and copied to clipboard!")
-}
-
-global pomodoroTimer := 0
-global pomodoroActive := false
-
-TogglePomodoro() {
-    global pomodoroActive
-    global pomodoroTimer
-
-    if (!pomodoroActive) {
-        pomodoroActive := true
-        pomodoroTimer := 25 * 60  ; 25 minutes in seconds
-        SetTimer PomodoroTick, 1000
-        ShowPomodoroTooltip("Pomodoro started: 25:00")
-    } else {
-        pomodoroActive := false
-        SetTimer PomodoroTick, 0
-        ShowTooltip("Pomodoro stopped")
-        pomodoroTimer := 0  ; Reset the timer when stopped
-    }
-}
-PomodoroTick() {
-    global pomodoroTimer
-
-    if (pomodoroTimer > 0) {
-        pomodoroTimer--
-        minutes := Floor(pomodoroTimer / 60)
-        seconds := Mod(pomodoroTimer, 60)
-        ShowPomodoroTooltip(Format("{:02d}:{:02d}", minutes, seconds))
-    } else {
-        SetTimer PomodoroTick, 0
-        ShowTooltip("Pomodoro finished!")
-        SoundPlay "*-1"
-    }
 }
 
 BrowseExe(pathEdit) {
