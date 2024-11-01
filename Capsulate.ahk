@@ -92,6 +92,8 @@ if (CheckLatestVersion()) {
 ^CapsLock:: SetCapsLockState GetKeyState("CapsLock", "T") ? "AlwaysOff" : "AlwaysOn"
 
 #HotIf capsLockPressed
++Left:: Send "#+{Left}" ; Moves active window to the second monitor
++Right:: Send "#+{Right}" ; Moves active window back to the first monitor
 1:: LaunchShortcut("1")
 2:: LaunchShortcut("2")
 3:: LaunchShortcut("3")
@@ -105,12 +107,14 @@ if (CheckLatestVersion()) {
 !c:: ShowUnifiedConfigGUI()
 Up:: SendInput "{Volume_Up}"
 Down:: SendInput "{Volume_Down}"
-Delete:: SendInput "{Volume_Mute}"
+BackSpace:: SendInput "{Volume_Mute}"
+Delete:: Run "*RunAs cleanmgr"
 Left:: Send "#^{Left}"
 Right:: Send "#^{Right}"
+Space:: Send "^!{Space}"
 T:: Run "taskmgr"
 W:: Run "ms-settings:windowsupdate"
-C:: Run "*RunAs cleanmgr"
+C:: Send "+#c"
 X:: RestartXMouseButtonControl()
 E:: ExpandText()
 P:: GeneratePassword()
