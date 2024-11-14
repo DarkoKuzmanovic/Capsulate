@@ -1,6 +1,6 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #SingleInstance Force
-SCRIPT_VERSION := "0.5.0"
+SCRIPT_VERSION := "0.6.0"
 
 config := LoadConfiguration()
 CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
@@ -10,12 +10,11 @@ DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
 
 global capsLockPressed := false
 global waitingForChord := false
-global trackingCode := ""
-global orderNumber := ""
-capsLockTimer := 0
-capsLockCount := 0
+global capsLockTimer := 0
+global capsLockCount := 0
 
 SetCapsLockState "AlwaysOff"
+SetTrayIcon()
 
 SetTrayIcon() {
     iconFile := IsWindowsDarkTheme()
@@ -29,7 +28,6 @@ IsWindowsDarkTheme() {
     return !RegRead(regKey, "AppsUseLightTheme")
 }
 
-SetTrayIcon()
 A_IconTip := "Capsulate v" . SCRIPT_VERSION . " - Enhance Your Caps Lock"
 
 trayMenu := A_TrayMenu
@@ -41,7 +39,6 @@ trayMenu.Add("Check for Updates", CheckForUpdates)
 trayMenu.Add("Run at Startup", (*) => ToggleStartup())
 trayMenu.Add()
 trayMenu.Add("Configuration`tCapsLock+Alt+C", (*) => ShowUnifiedConfigGUI())
-
 trayMenu.Add("Exit", (*) => ExitApp())
 
 SetTimer SetTrayIcon, 5000
@@ -51,7 +48,7 @@ if (CheckLatestVersion()) {
 }
 
 *CapsLock:: {
-    global capsLockPressed
+    global capsLockPressed, capsLockTimer
     capsLockPressed := true
     capsLockTimer := A_TickCount
 }
@@ -59,41 +56,29 @@ if (CheckLatestVersion()) {
 *CapsLock up:: {
     global capsLockPressed, capsLockTimer, capsLockCount, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT
 
-    ; Reset the CapsLock pressed state
     capsLockPressed := false
-
-    ; Calculate the time elapsed since the last CapsLock press
     elapsedTime := A_TickCount - capsLockTimer
 
-    ; Check if the elapsed time is within the timeout threshold
     if (elapsedTime < CAPS_LOCK_TIMEOUT) {
-        ; Increment the CapsLock press count
         capsLockCount++
-
-        ; Check if the double-click count has been reached
         if (capsLockCount = DOUBLE_CLICK_COUNT) {
-            ; Perform the double-click action
             SendInput DOUBLE_CLICK_ACTION
-            ; Reset the CapsLock press count
             capsLockCount := 0
         } else {
-            ; Set a timer to reset the CapsLock press count after the timeout
             SetTimer () => (capsLockCount := 0), -CAPS_LOCK_TIMEOUT
         }
     } else {
-        ; If the elapsed time is greater than the timeout, reset the count to 1
         capsLockCount := 1
     }
 
-    ; Update the timer for the last CapsLock press
     capsLockTimer := A_TickCount
 }
 
 ^CapsLock:: SetCapsLockState GetKeyState("CapsLock", "T") ? "AlwaysOff" : "AlwaysOn"
 
 #HotIf capsLockPressed
-+Left:: Send "#+{Left}" ; Moves active window to the second monitor
-+Right:: Send "#+{Right}" ; Moves active window back to the first monitor
++Left:: Send "#+{Left}"
++Right:: Send "#+{Right}"
 1:: LaunchShortcut("1")
 2:: LaunchShortcut("2")
 3:: LaunchShortcut("3")
@@ -118,59 +103,42 @@ C:: Send "+#c"
 X:: RestartXMouseButtonControl()
 E:: ExpandText()
 P:: GeneratePassword()
-K::
-{
+K:: {
     global waitingForChord
     waitingForChord := true
     ShowTooltip("Waiting for a second key of chord...")
-    SetTimer () => ToolTip(), -2000  ; Hide tooltip after 2 seconds
+    SetTimer () => ToolTip(), -2000
+}
+Esc:: {
+    SendInput "e"
+    Sleep 50
+    SendInput "!u"
+    Sleep 50
+    SendInput "{Down}"
+    Sleep 50
+    SendInput "{Right}"
+    Sleep 50
+    SendInput "{Down}"
+    Sleep 50
+    SendInput "{Enter}"
+    WinWaitActive "Enter name of file to save to…"
+    Sleep 1000
+    SendInput "^v"
+    Sleep 50
+    SendInput "{Enter}"
 }
 #HotIf
 
 #HotIf waitingForChord
-L::
-{
-    global waitingForChord
-    waitingForChord := false
-    ToolTip
-    ConvertCase("lower")
-}
-
-U::
-{
-    global waitingForChord
-    waitingForChord := false
-    ToolTip
-    ConvertCase("upper")
-}
-
-C::
-{
-    global waitingForChord
-    waitingForChord := false
-    ToolTip
-    ConvertCase("camel")
-}
-
-T::
-{
-    global waitingForChord
-    waitingForChord := false
-    ToolTip
-    ConvertCase("title")
-}
-
-Space::
-{
-    global waitingForChord
-    waitingForChord := false
-    ToolTip
-    ConvertCase("trim")
-}
+L:: ConvertCase("lower")
+U:: ConvertCase("upper")
+C:: ConvertCase("camel")
+T:: ConvertCase("title")
+Space:: ConvertCase("trim")
 #HotIf
 
 GetSelectedText() {
-    savedClipboard := ClipboardAll()
+    savedClipboard := ClipboardAll
     A_Clipboard := ""
     Send "^c"
     ClipWait(0.5)
@@ -181,9 +149,8 @@ GetSelectedText() {
 
 LaunchShortcut(key) {
     path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
-    if (path != "") {
+    if (path != "")
         Run(path)
-    }
 }
 
 ExpandText() {
@@ -200,7 +167,7 @@ ExpandText() {
 }
 
 GetWordAtCursor() {
-    savedClipboard := ClipboardAll()
+    savedClipboard := ClipboardAll
     A_Clipboard := ""
     SendInput "^{Left}^+{Right}^c"
     ClipWait(0.5)
@@ -210,30 +177,26 @@ GetWordAtCursor() {
 }
 
 GetExpansion(word) {
-    expansionsFile := A_ScriptDir . "\expansions.ini"
-    return IniRead(expansionsFile, "Expansions", word, "")
+    return IniRead(A_ScriptDir . "\expansions.ini", "Expansions", word, "")
 }
 
 ShowUnifiedConfigGUI() {
     global config
 
     configGui := Gui(, "Capsulate Configuration")
-    configGui.SetFont("s9", "Segoe UI")  ; Set Segoe UI as the default font
+    configGui.SetFont("s9", "Segoe UI")
 
-    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander", "Shortcuts"])
+    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander"])
 
     tabs.UseTab(1)
     configGui.Add("Text", "x20 y40 w150", "Caps Lock Timeout:")
     timeoutEdit := configGui.Add("Edit", "x170 y40 w50", config["CapsLockTimeout"])
-
     configGui.Add("Text", "x20 y70 w150", "Double Click Count:")
     doubleClickCountEdit := configGui.Add("Edit", "x170 y70 w50", config["DoubleClickCount"])
-
     configGui.Add("Text", "x20 y100 w150", "Tooltip Position:")
     tooltipPositionDropdown := configGui.Add("DropDownList", "vTooltipPosition x170 y100 w100", ["Near Mouse",
         "Near Tray"])
-    tooltipPositionDropdown.Choose(config["ToolTipPosition"] = 1 ? "Near Mouse" : "Near Tray")
-
+    tooltipPositionDropdown.Choose(config["ToolTipPosition"] ? "Near Mouse" : "Near Tray")
     configGui.Add("Text", "x20 y130 w150", "Double Click Action:")
     doubleClickActionEdit := configGui.Add("Edit", "x170 y130 w200", config["DoubleClickAction"])
 
@@ -242,27 +205,11 @@ ShowUnifiedConfigGUI() {
     abbrevEdit := configGui.Add("Edit", "x20 y60 w100")
     configGui.Add("Text", "x20 y90", "Expansion:")
     expansionEdit := configGui.Add("Edit", "x20 y110 w200 h60")
-
     lv := configGui.Add("ListView", "x20 y180 w360 h150", ["Abbreviation", "Expansion"])
     PopulateExpansionsList(lv)
-
     configGui.Add("Button", "x20 y340 w100", "Add/Update").OnEvent("Click", (*) => SaveExpansion(abbrevEdit,
         expansionEdit, lv))
     configGui.Add("Button", "x130 y340 w100", "Delete").OnEvent("Click", (*) => DeleteExpansion(lv))
-
-    tabs.UseTab(3)
-    configGui.Add("Text", "x20 y40 w150", "Select a number key:")
-    shortcutKeyDropdown := configGui.Add("DropDownList", "x170 y40 w50", ["1", "2", "3", "4", "5", "6", "7", "8", "9",
-        "0"])
-    configGui.Add("Text", "x20 y70 w150", "Executable or folder path:")
-    shortcutPathEdit := configGui.Add("Edit", "x170 y70 w180")
-    configGui.Add("Button", "x360 y70 w30", "...").OnEvent("Click", (*) => BrowseExe(shortcutPathEdit))
-    configGui.Add("Button", "x170 y100 w100", "Set Shortcut").OnEvent("Click", (*) => SetShortcut(shortcutKeyDropdown,
-        shortcutPathEdit))
-
-    global shortcutListView
-    shortcutListView := configGui.Add("ListView", "x20 y130 w360 h230", ["Key", "Path"])
-    PopulateShortcutList(shortcutListView)
 
     tabs.UseTab()
     configGui.Add("Button", "x20 y410 w100", "Save").OnEvent("Click", (*) => SaveUnifiedConfig(configGui, timeoutEdit,
@@ -286,23 +233,22 @@ SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionD
     DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
 
     configFile := A_ScriptDir . "\config.ini"
-    IniWrite config["CapsLockTimeout"], configFile, "General", "CapsLockTimeout"
-    IniWrite config["DoubleClickCount"], configFile, "General", "DoubleClickCount"
-    IniWrite config["ToolTipPosition"], configFile, "General", "ToolTipPosition"
-    IniWrite config["DoubleClickAction"], configFile, "General", "DoubleClickAction"
+    IniWrite(config["CapsLockTimeout"], configFile, "General", "CapsLockTimeout")
+    IniWrite(config["DoubleClickCount"], configFile, "General", "DoubleClickCount")
+    IniWrite(config["ToolTipPosition"], configFile, "General", "ToolTipPosition")
+    IniWrite(config["DoubleClickAction"], configFile, "General", "DoubleClickAction")
 
-    ; Save shortcuts
     loop 10 {
         key := A_Index - 1
         path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
-        if (path != "") {
+        if (path != "")
             IniWrite(path, configFile, "Shortcuts", key)
-        }
     }
 
     configGui.Destroy()
     ShowTooltip("Configuration saved successfully!")
 }
+
 PopulateExpansionsList(lv) {
     lv.Delete()
     expansionsFile := A_ScriptDir . "\expansions.ini"
@@ -310,17 +256,9 @@ PopulateExpansionsList(lv) {
         expansions := IniRead(expansionsFile, "Expansions")
         loop parse, expansions, "`n", "`r" {
             parts := StrSplit(A_LoopField, "=")
-            if (parts.Length == 2) {
-                lv.Add(, parts[1], parts[2])
-            }
+            if (parts.Length == 2)
+                lv.Add(parts[1], parts[2])
         }
-    }
-}
-
-LoadSelectedItem(lv, abbrevEdit, expansionEdit) {
-    if (row := lv.GetNext()) {
-        abbrevEdit.Value := lv.GetText(row, 1)
-        expansionEdit.Value := lv.GetText(row, 2)
     }
 }
 
@@ -328,8 +266,7 @@ SaveExpansion(abbrevEdit, expansionEdit, lv) {
     abbrev := abbrevEdit.Value
     expansion := expansionEdit.Value
     if (abbrev != "" and expansion != "") {
-        expansionsFile := A_ScriptDir . "\expansions.ini"
-        IniWrite expansion, expansionsFile, "Expansions", abbrev
+        IniWrite(expansion, A_ScriptDir . "\expansions.ini", "Expansions", abbrev)
         PopulateExpansionsList(lv)
         MsgBox "Expansion saved successfully!"
     } else {
@@ -339,27 +276,23 @@ SaveExpansion(abbrevEdit, expansionEdit, lv) {
 
 DeleteExpansion(lv) {
     if (row := lv.GetNext()) {
-        abbrev := lv.GetText(row, 1)
-        expansionsFile := A_ScriptDir . "\expansions.ini"
-        IniDelete expansionsFile, "Expansions", abbrev
+        IniDelete(A_ScriptDir . "\expansions.ini", "Expansions", lv.GetText(row, 1))
         lv.Delete(row)
     } else {
         MsgBox "Please select an expansion to delete."
     }
 }
+
 LoadConfiguration() {
     configFile := A_ScriptDir . "\config.ini"
-    if (!FileExist(configFile)) {
+    if (!FileExist(configFile))
         CreateDefaultConfig(configFile)
-    }
 
     config := Map()
     config["CapsLockTimeout"] := IniRead(configFile, "General", "CapsLockTimeout", 300)
     config["DoubleClickCount"] := IniRead(configFile, "General", "DoubleClickCount", 2)
     config["ToolTipPosition"] := IniRead(configFile, "General", "ToolTipPosition", 1)
     config["DoubleClickAction"] := IniRead(configFile, "General", "DoubleClickAction", "{LWin down}{F5}{LWin up}")
-
-    DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
 
     return config
 }
@@ -371,7 +304,10 @@ CreateDefaultConfig(configFile) {
     CapsLockTimeout=300
     DoubleClickCount=2
     ToolTipPosition=1
-    )", configFile
+    DoubleClickAction={LWin down}{F5}{LWin up}
+
+    )",
+        configFile
 }
 
 ShowTooltip(text) {
@@ -381,7 +317,6 @@ ShowTooltip(text) {
         tooltipGui := Gui("+AlwaysOnTop -Caption +ToolWindow")
         tooltipGui.BackColor := "0x202020"
         tooltipGui.Opt("+E0x20")
-
         tooltipGui.MarginX := 16
         tooltipGui.MarginY := 12
         tooltipGui.SetFont("s10 cWhite", "Segoe UI")
@@ -410,15 +345,14 @@ ToggleStartup() {
         trayMenu.Uncheck("Run at Startup")
         ShowTooltip("Capsulate removed from startup")
     } else {
-        FileCreateShortcut A_ScriptFullPath, startupFolder
+        FileCreateShortcut(A_ScriptFullPath, startupFolder)
         trayMenu.Check("Run at Startup")
         ShowTooltip("Capsulate added to startup")
     }
 }
 
-if (FileExist(A_Startup . "\Capsulate.lnk")) {
+if (FileExist(A_Startup . "\Capsulate.lnk"))
     trayMenu.Check("Run at Startup")
-}
 
 GeneratePassword() {
     chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
@@ -431,36 +365,12 @@ GeneratePassword() {
     ShowTooltip("Password generated and copied to clipboard!")
 }
 
-BrowseExe(pathEdit) {
-    selectedFile := FileSelect("3", , "Select an executable", "Executables (*.exe)")
-    if (selectedFile != "") {
-        pathEdit.Value := selectedFile
-    }
-}
-
-SetShortcut(keyDropdown, pathEdit) {
-    key := keyDropdown.Text
-    path := pathEdit.Value
-    if (key != "" and path != "") {
-        IniWrite(path, A_ScriptDir . "\config.ini", "Shortcuts", key)
-        PopulateShortcutList(shortcutListView)
-        ShowTooltip("Shortcut set successfully!")
-    }
-}
-
-PopulateShortcutList(listView) {
-    listView.Delete()
-    loop 10 {
-        key := A_Index - 1
-        path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
-        if (path != "") {
-            listView.Add(, key, path)
-        }
-    }
-}
-
 ConvertCase(caseType) {
-    savedClipboard := ClipboardAll()
+    global waitingForChord
+    waitingForChord := false
+    ToolTip()
+
+    savedClipboard := ClipboardAll
     A_Clipboard := ""
     Send "^c"
     if !ClipWait(0.5) {
@@ -475,7 +385,6 @@ ConvertCase(caseType) {
         return
     }
 
-    convertedText := ""
     switch caseType {
         case "lower":
             convertedText := StrLower(text)
@@ -497,7 +406,7 @@ ConvertCase(caseType) {
         ShowTooltip("Failed to convert text")
     }
 
-    Sleep 100  ; Give some time for the paste operation
+    Sleep 100
     A_Clipboard := savedClipboard
 }
 
@@ -507,12 +416,10 @@ ToCamelCase(str) {
     loop parse, str {
         if (A_LoopField = " " or A_LoopField = "_" or A_LoopField = "-") {
             nextUpper := true
-        }
-        else if (nextUpper) {
+        } else if (nextUpper) {
             result .= StrUpper(A_LoopField)
             nextUpper := false
-        }
-        else {
+        } else {
             result .= StrLower(A_LoopField)
         }
     }
@@ -539,11 +446,17 @@ CheckLatestVersion() {
         parsed := Jxon_Load(&response)
         latestVersion := parsed["tag_name"]
 
-        if (latestVersion != SCRIPT_VERSION) {
-            return true
+        latestParts := StrSplit(Trim(latestVersion, "v"), ".")
+        currentParts := StrSplit(SCRIPT_VERSION, ".")
+
+        loop 3 {
+            if (Number(latestParts[A_Index]) > Number(currentParts[A_Index])) {
+                return true
+            } else if (Number(latestParts[A_Index]) < Number(currentParts[A_Index])) {
+                return false
+            }
         }
-    }
-    catch {
+    } catch {
         ShowTooltip("Failed to check for updates.")
     }
     return false
@@ -551,11 +464,9 @@ CheckLatestVersion() {
 
 UpdateScript() {
     try {
-        ; Download new version
         Download("https://github.com/DarkoKuzmanovic/capsulate/releases/latest/download/Capsulate.ahk", A_ScriptDir .
             "\Capsulate_new.ahk")
 
-        ; Create update batch script
         updateScript := '
         (
         @echo off
@@ -569,6 +480,8 @@ UpdateScript() {
         FileAppend(updateScript, A_ScriptDir . "\update.bat")
         Run(A_ScriptDir . "\update.bat", , "Hide")
         ExitApp
+    } catch {
+        ShowTooltip("Failed to update script.")
     }
 }
 
@@ -578,8 +491,7 @@ CheckForUpdates(*) {
         if (result = "Yes") {
             UpdateScript()
         }
-    }
-    else {
+    } else {
         ShowTooltip("You have the latest version!")
     }
 }
@@ -595,25 +507,21 @@ Jxon_Load(&src, args*) {
             continue
         if !InStr(next, ch, true) {
             testArr := StrSplit(SubStr(src, 1, pos), "`n")
-
             ln := testArr.Length
             col := pos - InStr(src, "`n", , -(StrLen(src) - pos + 1))
-
-            msg := Format("{}: line {} col {} (char {})"
-                , (next == "") ? ["Extra data", ch := SubStr(src, pos)][1]
-                    : (next == "'") ? "Unterminated string starting at"
-                        : (next == "\") ? "Invalid \escape"
-                            : (next == ":") ? "Expecting ':' delimiter"
-                                : (next == '"') ? "Expecting object key enclosed in double quotes"
-                                    : (next == '"}') ?
-                                        "Expecting object key enclosed in double quotes or object closing '}'"
-                                        : (next == ",}") ? "Expecting ',' delimiter or object closing '}'"
-                                            : (next == ",]") ? "Expecting ',' delimiter or array closing ']'"
-                                                : [
-                                                    "Expecting JSON value(string, number, [true, false, null], object or array)",
-                                                    ch := SubStr(src, pos, (SubStr(src, pos) ~= "[\]\},\s]|$") - 1)][1]
-                , ln, col, pos)
-
+            msg := Format("{}: line {} col {} (char {})", (next == "") ? ["Extra data", ch := SubStr(src, pos)][1]
+                : (next == "'") ? "Unterminated string starting at"
+                    : (next == "\") ? "Invalid \escape"
+                        : (next == ":") ? "Expecting ':' delimiter"
+                            : (next == '"') ? "Expecting object key enclosed in double quotes"
+                                : (next == '"}') ?
+                                    "Expecting object key enclosed in double quotes or object closing '}'"
+                                    : (next == ",}") ? "Expecting ',' delimiter or object closing '}'"
+                                        : (next == ",]") ? "Expecting ',' delimiter or array closing ']'"
+                                            : [
+                                                "Expecting JSON value(string, number, [true, false, null], object or array)",
+                                                ch := SubStr(src, pos, (SubStr(src, pos) ~= "[\]\},\s]|$") - 1)][1]
+            , ln, col, pos)
             throw Error(msg, -1, ch)
         }
 
@@ -622,10 +530,8 @@ Jxon_Load(&src, args*) {
 
         if i := InStr("{[", ch) { ; start new object / map?
             val := (i = 1) ? Map() : Array()	; ahk v2
-
             is_array ? obj.Push(val) : obj[key] := val
             stack.InsertAt(1, val)
-
             next := '"' ((is_key := (ch == "{")) ? "}" : "{[]0123456789-tfn")
         } else if InStr("}]", ch) {
             stack.RemoveAt(1)
@@ -648,11 +554,11 @@ Jxon_Load(&src, args*) {
 
                 val := StrReplace(val, "\/", "/")
                 val := StrReplace(val, '\"', '"')
-                , val := StrReplace(val, "\b", "`b")
-                , val := StrReplace(val, "\f", "`f")
-                , val := StrReplace(val, "\n", "`n")
-                , val := StrReplace(val, "\r", "`r")
-                , val := StrReplace(val, "\t", "`t")
+                val := StrReplace(val, "\b", "`b")
+                val := StrReplace(val, "\f", "`f")
+                val := StrReplace(val, "\n", "`n")
+                val := StrReplace(val, "\r", "`r")
+                val := StrReplace(val, "\t", "`t")
 
                 i := 0
                 while i := InStr(val, "\", , i + 1) {
@@ -704,18 +610,16 @@ Jxon_Dump(obj, indent := "", lvl := 1) {
             if (indent < 0)
                 throw Error("Indent parameter must be a postive integer.", -1, indent)
             spaces := indent, indent := ""
-
-            loop spaces ; ===> changed
+            loop spaces
                 indent .= " "
         }
         indt := ""
-
         loop indent ? lvl : 0
             indt .= indent
 
         is_array := (obj is Array)
 
-        lvl += 1, out := "" ; Make #Warn happy
+        lvl += 1, out := ""
         for k, v in obj {
             if IsObject(k) || (k == "")
                 throw Error("Invalid object key.", -1, k ? Format("<Object at 0x{:p}>", ObjPtr(obj)) : "<blank>")
@@ -749,7 +653,6 @@ Jxon_Dump(obj, indent := "", lvl := 1) {
         obj := StrReplace(obj, "`f", "\f")
         obj := StrReplace(obj, "/", "\/")
         obj := StrReplace(obj, '"', '\"')
-
         return '"' obj '"'
     }
 }
