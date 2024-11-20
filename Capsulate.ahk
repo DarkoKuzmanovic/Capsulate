@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-SCRIPT_VERSION := "0.6.0"
+SCRIPT_VERSION := "0.7.0"
 
 ; Initialize global variables
 global CACHED_CONFIG := LoadConfiguration()
