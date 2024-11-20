@@ -101,38 +101,37 @@ Capsulate transforms the Caps Lock key into a powerful modifier key, enabling qu
   - `Caps Lock` (double-click): Performs a custom action (default: `Win+F5`).
   - `Ctrl + Caps Lock`: Toggles the traditional Caps Lock functionality.
 
-- **Modifier + Other Keys**
+### Modifier + Other Keys
 
-  - `Caps Lock + Up/Down`: Controls volume.
-  - `Caps Lock + Delete`: Mutes volume.
-  - `Caps Lock + Left/Right`: Window management (`Win + Ctrl + Left/Right`).
+- `Caps Lock + Up/Down`: Controls system volume
+- `Caps Lock + BackSpace`: Mutes volume
+- `Caps Lock + Left/Right`: Window management (`Win + Ctrl + Left/Right`)
+- `Caps Lock + Shift + Left/Right`: Window management with selection (`Win + Shift + Left/Right`)
+- `Caps Lock + Space`: Sends `Ctrl + Alt + Space`
 
-- **Text Expansion and Variables**
+### Text Conversion Chord Actions
 
-  - `[`: Copies selected text to `trackingCode`.
-  - `]`: Copies selected text to `orderNumber`.
+When `Caps Lock + K` is pressed, the following chord-based text transformations are available:
 
-- **Configuration and Toggles**
+- `L`: Convert text to lowercase
+- `U`: Convert text to UPPERCASE
+- `C`: Convert text to camelCase
+- `T`: Convert text to Title Case
+- `Space`: Trim whitespace from text
 
-  - `!c`: Opens the configuration GUI.
-  - `Esc`: Toggles the Pomodoro timer.
+### Shortcut Keys
 
-- **Media Controls**
+- `Caps Lock + 0-9`: Launch predefined shortcuts from configuration
+- `Caps Lock + Alt + C`: Open configuration GUI
 
-  - `Up`: Sends `{Volume_Up}`.
-  - `Down`: Sends `{Volume_Down}`.
-  - `Delete`: Sends `{Volume_Mute}`.
+### System and Utility Actions
 
-- **Window and System Controls**
-  - `Left`: Sends `Win + Ctrl + Left`.
-  - `Right`: Sends `Win + Ctrl + Right`.
-  - `T`: Runs Task Manager.
-  - `W`: Opens Windows Update settings.
-  - `C`: Runs Disk Cleanup as administrator.
-  - `X`: Restarts `XMouseButtonControl`.
-  - `E`: Expands selected text.
-  - `P`: Generates a secure password.
-  - `K`: Initiates a chord-based action.
+- `Caps Lock + T`: Open Task Manager
+- `Caps Lock + W`: Open Windows Update settings
+- `Caps Lock + C`: Open Windows Quick Settings
+- `Caps Lock + X`: Restart XMouseButtonControl
+- `Caps Lock + E`: Expand text using text expander
+- `Caps Lock + P`: Generate secure random password
 
 ## Configuration
 

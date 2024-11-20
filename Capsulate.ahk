@@ -2,11 +2,12 @@
 #SingleInstance Force
 SCRIPT_VERSION := "0.6.0"
 
-config := LoadConfiguration()
-CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
-DOUBLE_CLICK_COUNT := config["DoubleClickCount"]
-TOOLTIP_POSITION := config["ToolTipPosition"]
-DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
+; Initialize global variables
+global CACHED_CONFIG := LoadConfiguration()
+global CAPS_LOCK_TIMEOUT := CACHED_CONFIG["CapsLockTimeout"]
+global DOUBLE_CLICK_COUNT := CACHED_CONFIG["DoubleClickCount"]
+global TOOLTIP_POSITION := CACHED_CONFIG["ToolTipPosition"]
+global DOUBLE_CLICK_ACTION := CACHED_CONFIG["DoubleClickAction"]
 
 global capsLockPressed := false
 global waitingForChord := false
@@ -138,13 +139,29 @@ Space:: ConvertCase("trim")
 #HotIf
 
 GetSelectedText() {
-    savedClipboard := ClipboardAll
-    A_Clipboard := ""
-    Send "^c"
-    ClipWait(0.5)
-    selectedText := A_Clipboard
-    A_Clipboard := savedClipboard
-    return selectedText
+    static lastOperation := 0
+    currentTime := A_TickCount
+
+    ; Throttle clipboard operations
+    if (currentTime - lastOperation < 100) {
+        Sleep 50
+    }
+
+    try {
+        savedClipboard := ClipboardAll()
+        A_Clipboard := ""
+        Send "^c"
+        if !ClipWait(0.5) {
+            throw Error("Failed to get clipboard content")
+        }
+        selectedText := A_Clipboard
+        A_Clipboard := savedClipboard
+        lastOperation := A_TickCount
+        return selectedText
+    } catch Error as err {
+        ShowTooltip("Error getting selected text: " err.Message)
+        return ""
+    }
 }
 
 LaunchShortcut(key) {
@@ -181,7 +198,7 @@ GetExpansion(word) {
 }
 
 ShowUnifiedConfigGUI() {
-    global config
+    global CACHED_CONFIG
 
     configGui := Gui(, "Capsulate Configuration")
     configGui.SetFont("s9", "Segoe UI")
@@ -190,15 +207,15 @@ ShowUnifiedConfigGUI() {
 
     tabs.UseTab(1)
     configGui.Add("Text", "x20 y40 w150", "Caps Lock Timeout:")
-    timeoutEdit := configGui.Add("Edit", "x170 y40 w50", config["CapsLockTimeout"])
+    timeoutEdit := configGui.Add("Edit", "x170 y40 w50", CACHED_CONFIG["CapsLockTimeout"])
     configGui.Add("Text", "x20 y70 w150", "Double Click Count:")
-    doubleClickCountEdit := configGui.Add("Edit", "x170 y70 w50", config["DoubleClickCount"])
+    doubleClickCountEdit := configGui.Add("Edit", "x170 y70 w50", CACHED_CONFIG["DoubleClickCount"])
     configGui.Add("Text", "x20 y100 w150", "Tooltip Position:")
     tooltipPositionDropdown := configGui.Add("DropDownList", "vTooltipPosition x170 y100 w100", ["Near Mouse",
         "Near Tray"])
-    tooltipPositionDropdown.Choose(config["ToolTipPosition"] ? "Near Mouse" : "Near Tray")
+    tooltipPositionDropdown.Choose(CACHED_CONFIG["ToolTipPosition"] ? "Near Mouse" : "Near Tray")
     configGui.Add("Text", "x20 y130 w150", "Double Click Action:")
-    doubleClickActionEdit := configGui.Add("Edit", "x170 y130 w200", config["DoubleClickAction"])
+    doubleClickActionEdit := configGui.Add("Edit", "x170 y130 w200", CACHED_CONFIG["DoubleClickAction"])
 
     tabs.UseTab(2)
     configGui.Add("Text", "x20 y40", "Abbreviation:")
@@ -220,23 +237,23 @@ ShowUnifiedConfigGUI() {
 }
 
 SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown, doubleClickActionEdit) {
-    global config, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT, TOOLTIP_POSITION, DOUBLE_CLICK_ACTION
+    global CACHED_CONFIG, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT, TOOLTIP_POSITION, DOUBLE_CLICK_ACTION
 
-    config["CapsLockTimeout"] := timeoutEdit.Value
-    config["DoubleClickCount"] := doubleClickCountEdit.Value
-    config["ToolTipPosition"] := tooltipPositionDropdown.Value = "Near Mouse" ? 1 : 0
-    config["DoubleClickAction"] := doubleClickActionEdit.Value
+    CACHED_CONFIG["CapsLockTimeout"] := timeoutEdit.Value
+    CACHED_CONFIG["DoubleClickCount"] := doubleClickCountEdit.Value
+    CACHED_CONFIG["ToolTipPosition"] := tooltipPositionDropdown.Value = "Near Mouse" ? 1 : 0
+    CACHED_CONFIG["DoubleClickAction"] := doubleClickActionEdit.Value
 
-    CAPS_LOCK_TIMEOUT := config["CapsLockTimeout"]
-    DOUBLE_CLICK_COUNT := config["DoubleClickCount"]
-    TOOLTIP_POSITION := config["ToolTipPosition"]
-    DOUBLE_CLICK_ACTION := config["DoubleClickAction"]
+    CAPS_LOCK_TIMEOUT := CACHED_CONFIG["CapsLockTimeout"]
+    DOUBLE_CLICK_COUNT := CACHED_CONFIG["DoubleClickCount"]
+    TOOLTIP_POSITION := CACHED_CONFIG["ToolTipPosition"]
+    DOUBLE_CLICK_ACTION := CACHED_CONFIG["DoubleClickAction"]
 
     configFile := A_ScriptDir . "\config.ini"
-    IniWrite(config["CapsLockTimeout"], configFile, "General", "CapsLockTimeout")
-    IniWrite(config["DoubleClickCount"], configFile, "General", "DoubleClickCount")
-    IniWrite(config["ToolTipPosition"], configFile, "General", "ToolTipPosition")
-    IniWrite(config["DoubleClickAction"], configFile, "General", "DoubleClickAction")
+    IniWrite(CACHED_CONFIG["CapsLockTimeout"], configFile, "General", "CapsLockTimeout")
+    IniWrite(CACHED_CONFIG["DoubleClickCount"], configFile, "General", "DoubleClickCount")
+    IniWrite(CACHED_CONFIG["ToolTipPosition"], configFile, "General", "ToolTipPosition")
+    IniWrite(CACHED_CONFIG["DoubleClickAction"], configFile, "General", "DoubleClickAction")
 
     loop 10 {
         key := A_Index - 1
@@ -284,17 +301,22 @@ DeleteExpansion(lv) {
 }
 
 LoadConfiguration() {
-    configFile := A_ScriptDir . "\config.ini"
-    if (!FileExist(configFile))
-        CreateDefaultConfig(configFile)
-
-    config := Map()
-    config["CapsLockTimeout"] := IniRead(configFile, "General", "CapsLockTimeout", 300)
-    config["DoubleClickCount"] := IniRead(configFile, "General", "DoubleClickCount", 2)
-    config["ToolTipPosition"] := IniRead(configFile, "General", "ToolTipPosition", 1)
-    config["DoubleClickAction"] := IniRead(configFile, "General", "DoubleClickAction", "{LWin down}{F5}{LWin up}")
-
-    return config
+    try {
+        configFile := A_ScriptDir . "\config.ini"
+        if !FileExist(configFile) {
+            CreateDefaultConfig(configFile)
+        }
+        
+        return Map(
+            "CapsLockTimeout", IniRead(configFile, "General", "CapsLockTimeout", 300),
+            "DoubleClickCount", IniRead(configFile, "General", "DoubleClickCount", 2),
+            "ToolTipPosition", IniRead(configFile, "General", "ToolTipPosition", 1),
+            "DoubleClickAction", IniRead(configFile, "General", "DoubleClickAction", "{Esc}")
+        )
+    } catch Error as err {
+        MsgBox "Error loading configuration: " err.Message
+        ExitApp
+    }
 }
 
 CreateDefaultConfig(configFile) {
@@ -304,7 +326,7 @@ CreateDefaultConfig(configFile) {
     CapsLockTimeout=300
     DoubleClickCount=2
     ToolTipPosition=1
-    DoubleClickAction={LWin down}{F5}{LWin up}
+    DoubleClickAction={Esc}
 
     )",
         configFile
@@ -439,32 +461,26 @@ RestartXMouseButtonControl() {
 CheckLatestVersion() {
     try {
         whr := ComObject("WinHttp.WinHttpRequest.5.1")
-        whr.Open("GET", "https://api.github.com/repos/DarkoKuzmanovic/capsulate/releases/latest", true)
+        url := "https://api.github.com/repos/yourusername/Capsulate/releases/latest"
+        whr.Open("GET", url, true)
         whr.Send()
         whr.WaitForResponse()
-        response := whr.ResponseText
-        parsed := Jxon_Load(&response)
-        latestVersion := parsed["tag_name"]
-
-        latestParts := StrSplit(Trim(latestVersion, "v"), ".")
-        currentParts := StrSplit(SCRIPT_VERSION, ".")
-
-        loop 3 {
-            if (Number(latestParts[A_Index]) > Number(currentParts[A_Index])) {
-                return true
-            } else if (Number(latestParts[A_Index]) < Number(currentParts[A_Index])) {
-                return false
-            }
+        
+        if (whr.Status = 200) {
+            response := Jxon_Load(whr.ResponseText)
+            latestVersion := response["tag_name"]
+            return latestVersion > SCRIPT_VERSION
         }
-    } catch {
-        ShowTooltip("Failed to check for updates.")
+        return false
+    } catch Error as err {
+        ShowTooltip("Error checking for updates: " err.Message)
+        return false
     }
-    return false
 }
 
 UpdateScript() {
     try {
-        Download("https://github.com/DarkoKuzmanovic/capsulate/releases/latest/download/Capsulate.ahk", A_ScriptDir .
+        Download("https://github.com/yourusername/Capsulate/releases/latest/download/Capsulate.ahk", A_ScriptDir .
             "\Capsulate_new.ahk")
 
         updateScript := '
