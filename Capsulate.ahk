@@ -40,6 +40,7 @@ trayMenu.Add("Check for Updates", CheckForUpdates)
 trayMenu.Add("Run at Startup", (*) => ToggleStartup())
 trayMenu.Add()
 trayMenu.Add("Configuration`tCapsLock+Alt+C", (*) => ShowUnifiedConfigGUI())
+trayMenu.Add("Restart Script `tCapsLock+Alt+R", (*) => Reload())
 trayMenu.Add("Exit", (*) => ExitApp())
 
 SetTimer SetTrayIcon, 5000
@@ -74,7 +75,6 @@ if (CheckLatestVersion()) {
 
     capsLockTimer := A_TickCount
 }
-
 ^CapsLock:: SetCapsLockState GetKeyState("CapsLock", "T") ? "AlwaysOff" : "AlwaysOn"
 
 #HotIf capsLockPressed
@@ -91,6 +91,7 @@ if (CheckLatestVersion()) {
 9:: LaunchShortcut("9")
 0:: LaunchShortcut("0")
 !c:: ShowUnifiedConfigGUI()
+!r:: Reload()
 Up:: SendInput "{Volume_Up}"
 Down:: SendInput "{Volume_Down}"
 BackSpace:: SendInput "{Volume_Mute}"
@@ -110,25 +111,6 @@ K:: {
     ShowTooltip("Waiting for a second key of chord...")
     SetTimer () => ToolTip(), -2000
 }
-Esc:: {
-    SendInput "e"
-    Sleep 50
-    SendInput "!u"
-    Sleep 50
-    SendInput "{Down}"
-    Sleep 50
-    SendInput "{Right}"
-    Sleep 50
-    SendInput "{Down}"
-    Sleep 50
-    SendInput "{Enter}"
-    WinWaitActive "Enter name of file to save to…"
-    Sleep 1000
-    SendInput "^v"
-    Sleep 50
-    SendInput "{Enter}"
-}
-#HotIf
 
 #HotIf waitingForChord
 L:: ConvertCase("lower")
@@ -306,7 +288,7 @@ LoadConfiguration() {
         if !FileExist(configFile) {
             CreateDefaultConfig(configFile)
         }
-        
+
         return Map(
             "CapsLockTimeout", IniRead(configFile, "General", "CapsLockTimeout", 300),
             "DoubleClickCount", IniRead(configFile, "General", "DoubleClickCount", 2),
@@ -465,7 +447,7 @@ CheckLatestVersion() {
         whr.Open("GET", url, true)
         whr.Send()
         whr.WaitForResponse()
-        
+
         if (whr.Status = 200) {
             response := Jxon_Load(whr.ResponseText)
             latestVersion := response["tag_name"]
