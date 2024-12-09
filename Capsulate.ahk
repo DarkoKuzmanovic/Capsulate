@@ -316,29 +316,43 @@ CreateDefaultConfig(configFile) {
 
 ShowTooltip(text) {
     static tooltipGui := 0
+    maxWidth := 400  ; Maximum width in pixels
 
     if (!tooltipGui) {
         tooltipGui := Gui("+AlwaysOnTop -Caption +ToolWindow")
-        tooltipGui.BackColor := "0x202020"
+        tooltipGui.BackColor := "0x333333"
         tooltipGui.Opt("+E0x20")
-        tooltipGui.MarginX := 16
+        tooltipGui.MarginX := 12
         tooltipGui.MarginY := 12
         tooltipGui.SetFont("s10 cWhite", "Segoe UI")
-        tooltipGui.Add("Text", "vTooltipText", text)
+        tooltipGui.Add("Text", "vTooltipText w" maxWidth " +Wrap", text)
     } else {
         tooltipGui["TooltipText"].Value := text
     }
 
+    tooltipGui.Show("AutoSize Hide")  ; Get dimensions without showing
+    tooltipGui.GetPos(, , &width, &height)
+
     if (TOOLTIP_POSITION = 1) {
         MouseGetPos(&mouseX, &mouseY)
-        xPos := mouseX + 10
-        yPos := mouseY + 10
+        xPos := mouseX + 5
+        yPos := mouseY + 5
+
+        ; Ensure tooltip stays within screen bounds
+        if (xPos + width > A_ScreenWidth)
+            xPos := A_ScreenWidth - width - 5
+        if (yPos + height > A_ScreenHeight)
+            yPos := mouseY - height - 5
     } else {
-        xPos := A_ScreenWidth - 250
-        yPos := A_ScreenHeight - 100
+        xPos := A_ScreenWidth - width - 5
+        yPos := A_ScreenHeight - height - 5
     }
 
-    tooltipGui.Show(Format("x{} y{} AutoSize", xPos, yPos))
+    ; Ensure tooltip is always visible
+    xPos := Max(5, Min(xPos, A_ScreenWidth - width - 5))
+    yPos := Max(5, Min(yPos, A_ScreenHeight - height - 5))
+
+    tooltipGui.Show(Format("x{} y{}", xPos, yPos))
     SetTimer () => tooltipGui.Hide(), -2000
 }
 
