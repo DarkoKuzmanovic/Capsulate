@@ -1,0 +1,8 @@
+[2025-07-04 23:03:01] INFO: Configuration loaded successfully
+[2025-07-04 23:03:01] INFO: Capsulate v1.0.0 started successfully
+[2025-07-04 23:03:01] ERROR: Error checking for updates: Parameter #1 of Jxon_Load requires a variable reference, but received a String.
+[2025-07-04 23:03:53] INFO: XMouseButtonControl restarted successfully
+[2025-07-04 23:05:14] INFO: Configuration loaded successfully
+[2025-07-04 23:05:14] INFO: Capsulate v1.0.0 started successfully
+[2025-07-04 23:05:14] INFO: Latest version check: current=1.0.0, latest=0.5.0
+[2025-07-04 23:05:40] INFO: Launched shortcut 0: D:\source\repos
