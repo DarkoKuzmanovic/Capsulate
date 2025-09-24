@@ -1,6 +1,5 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-SCRIPT_VERSION := "1.0.0"
 
 ; Initialize global variables
 global CACHED_CONFIG := LoadConfiguration()
@@ -18,11 +17,11 @@ global capsLockCount := 0
 class Logger {
     static logFile := A_ScriptDir . "\capsulate.log"
     static maxLogSize := 1024 * 1024 ; 1MB
-    
+
     static Log(level, message) {
         timestamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
         logEntry := Format("[{1}] {2}: {3}`n", timestamp, level, message)
-        
+
         try {
             ; Check log file size and rotate if necessary
             if (FileExist(Logger.logFile)) {
@@ -31,25 +30,25 @@ class Logger {
                     FileMove Logger.logFile, Logger.logFile . ".old", 1
                 }
             }
-            
+
             FileAppend logEntry, Logger.logFile
         } catch {
             ; Silent fail for logging errors
         }
     }
-    
+
     static Info(message) {
         Logger.Log("INFO", message)
     }
-    
+
     static Error(message) {
         Logger.Log("ERROR", message)
     }
-    
+
     static Warning(message) {
         Logger.Log("WARNING", message)
     }
-    
+
     static Debug(message) {
         Logger.Log("DEBUG", message)
     }
@@ -60,57 +59,57 @@ class ConfigValidator {
     static Validate(config) {
         errors := []
         correctedConfig := config.Clone()
-        
+
         ; Validate CapsLockTimeout (50-5000ms)
         timeout := Integer(config["CapsLockTimeout"])
         if (timeout < 50 || timeout > 5000) {
             errors.Push("CapsLockTimeout must be between 50-5000ms")
             correctedConfig["CapsLockTimeout"] := 300
         }
-        
+
         ; Validate DoubleClickCount (1-5)
         clickCount := Integer(config["DoubleClickCount"])
         if (clickCount < 1 || clickCount > 5) {
             errors.Push("DoubleClickCount must be between 1-5")
             correctedConfig["DoubleClickCount"] := 2
         }
-        
+
         ; Validate ToolTipPosition (0 or 1)
         tooltipPos := Integer(config["ToolTipPosition"])
         if (tooltipPos != 0 && tooltipPos != 1) {
             errors.Push("ToolTipPosition must be 0 or 1")
             correctedConfig["ToolTipPosition"] := 1
         }
-        
+
         ; Validate DoubleClickAction (basic validation)
         action := config["DoubleClickAction"]
         if (StrLen(action) > 100) {
             errors.Push("DoubleClickAction is too long (max 100 characters)")
             correctedConfig["DoubleClickAction"] := "{Esc}"
         }
-        
+
         return {
             isValid: errors.Length == 0,
             errors: errors,
             correctedConfig: correctedConfig
         }
     }
-    
+
     static ValidateShortcutPath(path) {
         if (path == "") {
             return true
         }
-        
+
         ; Check for dangerous commands
         dangerousCommands := ["format", "del", "rm", "rmdir", "rd"]
         lowerPath := StrLower(path)
-        
+
         for cmd in dangerousCommands {
             if (InStr(lowerPath, cmd)) {
                 return false
             }
         }
-        
+
         return true
     }
 }
@@ -120,7 +119,7 @@ class ThemeManager {
     static cachedTheme := ""
     static lastCheck := 0
     static CACHE_DURATION := 30000 ; 30 seconds
-    
+
     static IsDarkTheme() {
         currentTime := A_TickCount
         if (ThemeManager.cachedTheme == "" || currentTime - ThemeManager.lastCheck > ThemeManager.CACHE_DURATION) {
@@ -134,9 +133,9 @@ class ThemeManager {
         }
         return ThemeManager.cachedTheme
     }
-    
+
     static GetIconPath() {
-        return ThemeManager.IsDarkTheme() 
+        return ThemeManager.IsDarkTheme()
             ? A_ScriptDir . "\capsulate-dark.png"
             : A_ScriptDir . "\capsulate-light.png"
     }
@@ -144,7 +143,7 @@ class ThemeManager {
 
 ; Constants Class
 class Constants {
-    static SCRIPT_VERSION := "1.0.0"
+    static SCRIPT_VERSION := "1.0.1"
     static GITHUB_USER := "DarkoKuzmanovic"
     static GITHUB_REPO := "Capsulate"
     static DEFAULT_TIMEOUT := 300
@@ -155,11 +154,11 @@ class Constants {
     static CLIPBOARD_THROTTLE_MS := 100
     static THEME_CACHE_DURATION := 30000 ; 30 seconds
     static TRAY_ICON_UPDATE_INTERVAL := 30000 ; 30 seconds
-    
+
     static GetGitHubApiUrl() {
         return "https://api.github.com/repos/" . Constants.GITHUB_USER . "/" . Constants.GITHUB_REPO . "/releases/latest"
     }
-    
+
     static GetDownloadUrl() {
         return "https://github.com/" . Constants.GITHUB_USER . "/" . Constants.GITHUB_REPO . "/releases/latest/download/Capsulate.ahk"
     }
@@ -170,23 +169,23 @@ class ClipboardManager {
     static mutex := false
     static lastOperation := 0
     static THROTTLE_MS := 100
-    
+
     static SafeClipboardOperation(operation) {
         ; Wait for mutex release
         while (ClipboardManager.mutex) {
             Sleep 10
         }
-        
+
         ; Acquire mutex
         ClipboardManager.mutex := true
-        
+
         try {
             ; Throttle operations
             currentTime := A_TickCount
             if (currentTime - ClipboardManager.lastOperation < ClipboardManager.THROTTLE_MS) {
                 Sleep ClipboardManager.THROTTLE_MS - (currentTime - ClipboardManager.lastOperation)
             }
-            
+
             result := operation.Call()
             ClipboardManager.lastOperation := A_TickCount
             return result
@@ -194,22 +193,22 @@ class ClipboardManager {
             ClipboardManager.mutex := false
         }
     }
-    
+
     static GetSelectedText() {
         operation := Func("ClipboardManager_GetSelectedTextOperation")
         return ClipboardManager.SafeClipboardOperation(operation)
     }
-    
+
     static GetWordAtCursor() {
         operation := Func("ClipboardManager_GetWordAtCursorOperation")
         return ClipboardManager.SafeClipboardOperation(operation)
     }
-    
+
     static SetClipboardText(text) {
         operation := Func("ClipboardManager_SetClipboardTextOperation").Bind(text)
         return ClipboardManager.SafeClipboardOperation(operation)
     }
-    
+
     static ConvertSelectedText(converter) {
         operation := Func("ClipboardManager_ConvertSelectedTextOperation").Bind(converter)
         return ClipboardManager.SafeClipboardOperation(operation)
@@ -219,24 +218,32 @@ class ClipboardManager {
 ; Helper functions for ClipboardManager operations
 ClipboardManager_GetSelectedTextOperation() {
     savedClipboard := ClipboardAll()
-    A_Clipboard := ""
-    Send "^c"
-    if !ClipWait(0.5) {
-        throw Error("Failed to get clipboard content")
+    try {
+        A_Clipboard := ""
+        Send "^c"
+        if !ClipWait(1.0) {
+            throw Error("Failed to get clipboard content")
+        }
+        selectedText := A_Clipboard
+        return selectedText
+    } finally {
+        A_Clipboard := savedClipboard
     }
-    selectedText := A_Clipboard
-    A_Clipboard := savedClipboard
-    return selectedText
 }
 
 ClipboardManager_GetWordAtCursorOperation() {
     savedClipboard := ClipboardAll()
-    A_Clipboard := ""
-    SendInput "^{Left}^+{Right}^c"
-    ClipWait(0.5)
-    word := A_Clipboard
-    A_Clipboard := savedClipboard
-    return Trim(word)
+    try {
+        A_Clipboard := ""
+        SendInput "^{Left}^+{Right}^c"
+        if !ClipWait(1.0) {
+            throw Error("Failed to get word at cursor")
+        }
+        word := A_Clipboard
+        return Trim(word)
+    } finally {
+        A_Clipboard := savedClipboard
+    }
 }
 
 ClipboardManager_SetClipboardTextOperation(text) {
@@ -246,32 +253,35 @@ ClipboardManager_SetClipboardTextOperation(text) {
 
 ClipboardManager_ConvertSelectedTextOperation(converter) {
     savedClipboard := ClipboardAll()
-    A_Clipboard := ""
-    Send "^c"
-    if !ClipWait(0.5) {
-        throw Error("No text selected")
+    try {
+        A_Clipboard := ""
+        Send "^c"
+        if !ClipWait(1.0) {
+            throw Error("No text selected")
+        }
+
+        text := A_Clipboard
+        if (text = "") {
+            throw Error("Selected text is empty")
+        }
+
+        convertedText := converter.Call(text)
+        if (convertedText != "") {
+            A_Clipboard := convertedText
+            Send "^v"
+            Sleep 100
+        }
+        return convertedText
+    } finally {
+        A_Clipboard := savedClipboard
     }
-    
-    text := A_Clipboard
-    if (text = "") {
-        throw Error("Selected text is empty")
-    }
-    
-    convertedText := converter.Call(text)
-    if (convertedText != "") {
-        A_Clipboard := convertedText
-        Send "^v"
-        Sleep 100
-    }
-    A_Clipboard := savedClipboard
-    return convertedText
 }
 
 try {
     SetCapsLockState "AlwaysOff"
     SetTrayIcon()
-    Logger.Info("Capsulate v" . SCRIPT_VERSION . " started successfully")
-} catch Error as err {
+    Logger.Info("Capsulate v" . Constants.SCRIPT_VERSION . " started successfully")
+} catch as err {
     Logger.Error("Error during startup: " . err.Message)
     MsgBox "Error during startup: " . err.Message
 }
@@ -280,7 +290,7 @@ SetTrayIcon() {
     try {
         iconFile := ThemeManager.GetIconPath()
         TraySetIcon(iconFile)
-    } catch Error as err {
+    } catch as err {
         Logger.Error("Error setting tray icon: " . err.Message)
     }
 }
@@ -289,12 +299,12 @@ IsWindowsDarkTheme() {
     return ThemeManager.IsDarkTheme()
 }
 
-A_IconTip := "Capsulate v" . SCRIPT_VERSION . " - Enhance Your Caps Lock"
+A_IconTip := "Capsulate v" . Constants.SCRIPT_VERSION . " - Enhance Your Caps Lock"
 
 trayMenu := A_TrayMenu
 trayMenu.Delete()
-trayMenu.Add("Capsulate v" . SCRIPT_VERSION, (*) => {})
-trayMenu.Disable("Capsulate v" . SCRIPT_VERSION)
+trayMenu.Add("Capsulate v" . Constants.SCRIPT_VERSION, (*) => {})
+trayMenu.Disable("Capsulate v" . Constants.SCRIPT_VERSION)
 trayMenu.Add()
 trayMenu.Add("Check for Updates", CheckForUpdates)
 trayMenu.Add("Run at Startup", (*) => ToggleStartup())
@@ -309,7 +319,7 @@ try {
     if (CheckLatestVersion()) {
         ShowTooltip("A new version is available!")
     }
-} catch Error as err {
+} catch as err {
     Logger.Error("Error during startup version check: " . err.Message)
 }
 
@@ -387,9 +397,9 @@ Space:: ConvertCase("trim")
 GetSelectedText() {
     try {
         return ClipboardManager.GetSelectedText()
-    } catch Error as err {
-        Logger.Error("Error getting selected text: " err.Message)
-        ShowTooltip("Error getting selected text: " err.Message)
+    } catch as err {
+        Logger.Error("Error getting selected text: " . err.Message)
+        ShowTooltip("Error getting selected text: " . err.Message)
         return ""
     }
 }
@@ -406,7 +416,7 @@ LaunchShortcut(key) {
                 ShowTooltip("Shortcut blocked for security reasons")
             }
         }
-    } catch Error as err {
+    } catch as err {
         Logger.Error("Error launching shortcut " . key . ": " . err.Message)
         ShowTooltip("Error launching shortcut: " . err.Message)
     }
@@ -419,7 +429,7 @@ ExpandText() {
             ShowTooltip("No word found at cursor")
             return
         }
-        
+
         Logger.Debug("Expanding text: " . word)
         expansion := GetExpansion(word)
         if (expansion && expansion != "") {
@@ -430,7 +440,7 @@ ExpandText() {
         } else {
             ShowTooltip("No expansion found for: " . word)
         }
-    } catch Error as err {
+    } catch as err {
         Logger.Error("Error expanding text: " . err.Message)
         ShowTooltip("Error expanding text: " . err.Message)
     }
@@ -439,9 +449,9 @@ ExpandText() {
 GetWordAtCursor() {
     try {
         return ClipboardManager.GetWordAtCursor()
-    } catch Error as err {
-        Logger.Error("Error getting word at cursor: " err.Message)
-        ShowTooltip("Error getting word at cursor: " err.Message)
+    } catch as err {
+        Logger.Error("Error getting word at cursor: " . err.Message)
+        ShowTooltip("Error getting word at cursor: " . err.Message)
         return ""
     }
 }
@@ -454,7 +464,7 @@ GetExpansion(word) {
             return ""
         }
         return IniRead(expansionsFile, "Expansions", word, "")
-    } catch Error as err {
+    } catch as err {
         Logger.Error("Error reading expansion: " . err.Message)
         return ""
     }
@@ -502,10 +512,30 @@ ShowUnifiedConfigGUI() {
 SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionDropdown, doubleClickActionEdit) {
     global CACHED_CONFIG, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT, TOOLTIP_POSITION, DOUBLE_CLICK_ACTION
 
-    CACHED_CONFIG["CapsLockTimeout"] := timeoutEdit.Value
-    CACHED_CONFIG["DoubleClickCount"] := doubleClickCountEdit.Value
-    CACHED_CONFIG["ToolTipPosition"] := tooltipPositionDropdown.Value = "Near Mouse" ? 1 : 0
-    CACHED_CONFIG["DoubleClickAction"] := doubleClickActionEdit.Value
+    ; Create config from GUI values for validation
+    guiConfig := Map(
+        "CapsLockTimeout", Integer(timeoutEdit.Value),
+        "DoubleClickCount", Integer(doubleClickCountEdit.Value),
+        "ToolTipPosition", tooltipPositionDropdown.Value = "Near Mouse" ? 1 : 0,
+        "DoubleClickAction", doubleClickActionEdit.Value
+    )
+
+    ; Validate GUI edits before saving
+    ValidationResult := ConfigValidator.Validate(guiConfig)
+    if (!ValidationResult.isValid) {
+        errorMessages := ""
+        for error in ValidationResult.errors {
+            errorMessages .= error . "`n"
+        }
+        errorMessages := Trim(errorMessages, "`n")
+        MsgBox("Configuration validation failed:`n`n" . errorMessages . "`n`nPlease correct the values and try again.", "Validation Error", "OK")
+        return
+    }
+
+    CACHED_CONFIG["CapsLockTimeout"] := guiConfig["CapsLockTimeout"]
+    CACHED_CONFIG["DoubleClickCount"] := guiConfig["DoubleClickCount"]
+    CACHED_CONFIG["ToolTipPosition"] := guiConfig["ToolTipPosition"]
+    CACHED_CONFIG["DoubleClickAction"] := guiConfig["DoubleClickAction"]
 
     CAPS_LOCK_TIMEOUT := CACHED_CONFIG["CapsLockTimeout"]
     DOUBLE_CLICK_COUNT := CACHED_CONFIG["DoubleClickCount"]
@@ -535,9 +565,12 @@ PopulateExpansionsList(lv) {
     if (FileExist(expansionsFile)) {
         expansions := IniRead(expansionsFile, "Expansions")
         loop parse, expansions, "`n", "`r" {
-            parts := StrSplit(A_LoopField, "=")
-            if (parts.Length == 2)
-                lv.Add(parts[1], parts[2])
+            eqPos := InStr(A_LoopField, "=")
+            if (eqPos > 0) {
+                abbrev := SubStr(A_LoopField, 1, eqPos - 1)
+                expansion := SubStr(A_LoopField, eqPos + 1)
+                lv.Add(abbrev, expansion)
+            }
         }
     }
 }
@@ -576,21 +609,30 @@ LoadConfiguration() {
             "ToolTipPosition", IniRead(configFile, "General", "ToolTipPosition", 1),
             "DoubleClickAction", IniRead(configFile, "General", "DoubleClickAction", "{Esc}")
         )
-        
+
         ; Validate configuration
         ValidationResult := ConfigValidator.Validate(config)
         if (!ValidationResult.isValid) {
-            Logger.Warning("Configuration validation failed: " ValidationResult.errors)
+            errorMessages := ""
+            for error in ValidationResult.errors {
+                errorMessages .= error . "; "
+            }
+            errorMessages := Trim(errorMessages, "; ")
+            Logger.Warning("Configuration validation failed: " . errorMessages)
             ShowTooltip("Configuration issues found. Check log for details.")
+            ; Persist corrected values back to config file
+            for key, value in ValidationResult.correctedConfig {
+                IniWrite(value, configFile, "General", key)
+            }
             ; Use corrected values
             config := ValidationResult.correctedConfig
         }
-        
+
         Logger.Info("Configuration loaded successfully")
         return config
-    } catch Error as err {
-        Logger.Error("Error loading configuration: " err.Message)
-        MsgBox "Error loading configuration: " err.Message
+    } catch as err {
+        Logger.Error("Error loading configuration: " . err.Message)
+        MsgBox "Error loading configuration: " . err.Message
         ExitApp
     }
 }
@@ -677,9 +719,9 @@ GeneratePassword() {
         ClipboardManager.SetClipboardText(password)
         ShowTooltip("Password generated and copied to clipboard!")
         Logger.Info("Password generated successfully")
-    } catch Error as err {
-        Logger.Error("Error generating password: " err.Message)
-        ShowTooltip("Error generating password: " err.Message)
+    } catch as err {
+        Logger.Error("Error generating password: " . err.Message)
+        ShowTooltip("Error generating password: " . err.Message)
     }
 }
 
@@ -702,16 +744,16 @@ ConvertCase(caseType) {
             case "trim":
                 converter := (text) => Trim(text)
         }
-        
+
         if (converter) {
             convertedText := ClipboardManager.ConvertSelectedText(converter)
             ShowTooltip("Text converted to " . caseType)
         } else {
             ShowTooltip("Unknown conversion type: " . caseType)
         }
-    } catch Error as err {
-        Logger.Error("Error converting text: " err.Message)
-        ShowTooltip("Error converting text: " err.Message)
+    } catch as err {
+        Logger.Error("Error converting text: " . err.Message)
+        ShowTooltip("Error converting text: " . err.Message)
     }
 }
 
@@ -744,7 +786,7 @@ RestartXMouseButtonControl() {
         Run("XMouseButtonControl.exe")
         ShowTooltip("XMouseButtonControl restarted")
         Logger.Info("XMouseButtonControl restarted successfully")
-    } catch Error as err {
+    } catch as err {
         Logger.Error("Error restarting XMouseButtonControl: " . err.Message)
         ShowTooltip("Error restarting XMouseButtonControl: " . err.Message)
     }
@@ -756,6 +798,7 @@ CheckLatestVersion() {
         url := Constants.GetGitHubApiUrl()
         whr.Open("GET", url, true)
         whr.SetTimeouts(5000, 5000, 10000, 10000) ; Set reasonable timeouts
+        whr.SetRequestHeader("User-Agent", "Capsulate/" . Constants.SCRIPT_VERSION)
         whr.Send()
         whr.WaitForResponse()
 
@@ -763,15 +806,15 @@ CheckLatestVersion() {
             responseText := whr.ResponseText
             response := Jxon_Load(&responseText)
             latestVersion := response["tag_name"]
-            Logger.Info("Latest version check: current=" . SCRIPT_VERSION . ", latest=" . latestVersion)
-            return CompareVersions(latestVersion, SCRIPT_VERSION) > 0
+            Logger.Info("Latest version check: current=" . Constants.SCRIPT_VERSION . ", latest=" . latestVersion)
+            return CompareVersions(latestVersion, Constants.SCRIPT_VERSION) > 0
         } else {
             Logger.Warning("HTTP error checking for updates: " . whr.Status)
             return false
         }
-    } catch Error as err {
-        Logger.Error("Error checking for updates: " err.Message)
-        ShowTooltip("Error checking for updates: " err.Message)
+    } catch as err {
+        Logger.Error("Error checking for updates: " . err.Message)
+        ShowTooltip("Error checking for updates: " . err.Message)
         return false
     }
 }
@@ -780,19 +823,19 @@ CompareVersions(version1, version2) {
     ; Remove 'v' prefix if present
     v1 := StrReplace(version1, "v", "")
     v2 := StrReplace(version2, "v", "")
-    
+
     v1Parts := StrSplit(v1, ".")
     v2Parts := StrSplit(v2, ".")
-    
+
     maxLength := Max(v1Parts.Length, v2Parts.Length)
-    
+
     Loop maxLength {
         part1 := v1Parts.Has(A_Index) ? Integer(v1Parts[A_Index]) : 0
         part2 := v2Parts.Has(A_Index) ? Integer(v2Parts[A_Index]) : 0
-        
-        if (part1 > part2) 
+
+        if (part1 > part2)
             return 1
-        if (part1 < part2) 
+        if (part1 < part2)
             return -1
     }
     return 0
@@ -802,15 +845,15 @@ UpdateScript() {
     try {
         downloadUrl := Constants.GetDownloadUrl()
         newScriptPath := A_ScriptDir . "\Capsulate_new.ahk"
-        
+
         Logger.Info("Starting script update from: " . downloadUrl)
         Download(downloadUrl, newScriptPath)
-        
+
         ; Verify the downloaded file
         if (!FileExist(newScriptPath)) {
             throw Error("Downloaded file does not exist")
         }
-        
+
         downloadedSize := FileGetSize(newScriptPath)
         if (downloadedSize < 1000) {
             throw Error("Downloaded file is too small, likely corrupted")
@@ -830,7 +873,7 @@ UpdateScript() {
         Logger.Info("Update script created, starting update process")
         Run(A_ScriptDir . "\update.bat", , "Hide")
         ExitApp
-    } catch Error as err {
+    } catch as err {
         Logger.Error("Failed to update script: " . err.Message)
         ShowTooltip("Failed to update script: " . err.Message)
         ; Clean up failed download
