@@ -143,7 +143,7 @@ class ThemeManager {
 
 ; Constants Class
 class Constants {
-    static SCRIPT_VERSION := "1.0.2"
+    static SCRIPT_VERSION := "1.0.3"
     static GITHUB_USER := "DarkoKuzmanovic"
     static GITHUB_REPO := "Capsulate"
     static DEFAULT_TIMEOUT := 300
@@ -674,9 +674,9 @@ ShowTooltip(text) {
         if (yPos + height > A_ScreenHeight)
             yPos := mouseY - height - 5
     } else {
-        mon := SysGet("MonitorWorkArea")
-        xPos := mon.Right - width - 5
-        yPos := mon.Bottom - height - 5
+        MonitorGetWorkArea(MonitorGetPrimary(), &monLeft, &monTop, &monRight, &monBottom)
+        xPos := monRight - width - 5
+        yPos := monBottom - height - 5
     }
 
     ; Ensure tooltip is always visible
@@ -854,13 +854,17 @@ UpdateScript() {
             throw Error("Downloaded file is too small, likely corrupted")
         }
 
+        ; Resolve paths before creating batch script
+        currentScriptPath := A_ScriptFullPath
+        scriptDir := A_ScriptDir
+
         updateScript := '
         (
         @echo off
         timeout /t 2 /nobreak
-        del "' . A_ScriptFullPath . '"
-        move "' . A_ScriptDir . '\Capsulate_new.ahk" "' . A_ScriptFullPath . '"
-        start "" "' . A_ScriptFullPath . '"
+        del "' . currentScriptPath . '"
+        move "' . scriptDir . '\Capsulate_new.ahk" "' . currentScriptPath . '"
+        start "" "' . currentScriptPath . '"
         del "%~f0"
         )'
 
