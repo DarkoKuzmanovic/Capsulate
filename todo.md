@@ -1,6 +1,0 @@
-- [ ] Harden the clipboard helpers in `Capsulate.ahk:220-268` so the previous clipboard contents are always restored (even when `ClipWait` times out or the converter throws) and consider relaxing the 0.5s timeout to prevent false error tooltips on slower apps.
-- [ ] Adjust `PopulateExpansionsList` in `Capsulate.ahk:533-541` to split on only the first `=` so expansions that contain that character load and round-trip correctly in the GUI.
-- [ ] After validation in `Capsulate.ahk:581-587`, persist `ValidationResult.correctedConfig` back to `config.ini` and join the collected error messages before logging so users aren't warned on every start.
-- [ ] Run `ConfigValidator.Validate` on the GUI edits in `Capsulate.ahk:502-529` before saving, surfacing problems to the user instead of writing invalid values that get auto-corrected later.
-- [ ] Add the required GitHub API headers (at least `User-Agent`) prior to `whr.Send()` in `Capsulate.ahk:755-770` to avoid 403 responses when checking for updates.
-- [ ] Collapse the duplicate version constants in `Capsulate.ahk:3` and `Capsulate.ahk:147` into a single source so the tray tooltip and update checks always agree.

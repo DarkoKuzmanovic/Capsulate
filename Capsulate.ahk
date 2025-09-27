@@ -143,7 +143,7 @@ class ThemeManager {
 
 ; Constants Class
 class Constants {
-    static SCRIPT_VERSION := "1.0.1"
+    static SCRIPT_VERSION := "1.0.2"
     static GITHUB_USER := "DarkoKuzmanovic"
     static GITHUB_REPO := "Capsulate"
     static DEFAULT_TIMEOUT := 300
@@ -295,10 +295,6 @@ SetTrayIcon() {
     }
 }
 
-IsWindowsDarkTheme() {
-    return ThemeManager.IsDarkTheme()
-}
-
 A_IconTip := "Capsulate v" . Constants.SCRIPT_VERSION . " - Enhance Your Caps Lock"
 
 trayMenu := A_TrayMenu
@@ -330,14 +326,15 @@ try {
 }
 
 *CapsLock up:: {
-    global capsLockPressed, capsLockTimer, capsLockCount, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT
+    global capsLockPressed, capsLockTimer, capsLockCount, CAPS_LOCK_TIMEOUT, DOUBLE_CLICK_COUNT, DOUBLE_CLICK_ACTION
 
     capsLockPressed := false
     elapsedTime := A_TickCount - capsLockTimer
 
     if (elapsedTime < CAPS_LOCK_TIMEOUT) {
         capsLockCount++
-        if (capsLockCount = DOUBLE_CLICK_COUNT) {
+        ; BUG FIX: Use comparison (==) instead of assignment (=)
+        if (capsLockCount == DOUBLE_CLICK_COUNT) {
             SendInput DOUBLE_CLICK_ACTION
             capsLockCount := 0
         } else {
@@ -346,8 +343,6 @@ try {
     } else {
         capsLockCount := 1
     }
-
-    capsLockTimer := A_TickCount
 }
 ^CapsLock:: SetCapsLockState GetKeyState("CapsLock", "T") ? "AlwaysOff" : "AlwaysOn"
 
@@ -383,7 +378,8 @@ K:: {
     global waitingForChord
     waitingForChord := true
     ShowTooltip("Waiting for a second key of chord...")
-    SetTimer () => ToolTip(), -2000
+    ; BUG FIX: Timer must also reset the waitingForChord state to avoid getting stuck
+    SetTimer () => (waitingForChord := false, ToolTip()), -2000
 }
 
 #HotIf waitingForChord
@@ -434,7 +430,9 @@ ExpandText() {
         expansion := GetExpansion(word)
         if (expansion && expansion != "") {
             SendInput "{BackSpace " . StrLen(word) . "}"
-            SendInput expansion
+            ; BUG FIX: Use {Text} mode to send expansion literally
+            ; to avoid issues with special characters like +, ^, !, #
+            SendInput "{Text}" . expansion
             ShowTooltip("Expanded: " . word . " → " . expansion)
             Logger.Info("Text expanded: " . word . " → " . expansion)
         } else {
@@ -548,12 +546,8 @@ SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionD
     IniWrite(CACHED_CONFIG["ToolTipPosition"], configFile, "General", "ToolTipPosition")
     IniWrite(CACHED_CONFIG["DoubleClickAction"], configFile, "General", "DoubleClickAction")
 
-    loop 10 {
-        key := A_Index - 1
-        path := IniRead(A_ScriptDir . "\config.ini", "Shortcuts", key, "")
-        if (path != "")
-            IniWrite(path, configFile, "Shortcuts", key)
-    }
+    ; BUG FIX: This loop was redundant as it reads and rewrites the same values.
+    ; It has been removed.
 
     configGui.Destroy()
     ShowTooltip("Configuration saved successfully!")
@@ -661,7 +655,7 @@ ShowTooltip(text) {
         tooltipGui.MarginX := 12
         tooltipGui.MarginY := 12
         tooltipGui.SetFont("s10 cWhite", "Segoe UI")
-        tooltipGui.Add("Text", "vTooltipText w" maxWidth " +Wrap", text)
+        tooltipGui.Add("Text", "vTooltipText w" . maxWidth . " +Wrap", text)
     } else {
         tooltipGui["TooltipText"].Value := text
     }
@@ -680,8 +674,9 @@ ShowTooltip(text) {
         if (yPos + height > A_ScreenHeight)
             yPos := mouseY - height - 5
     } else {
-        xPos := A_ScreenWidth - width - 5
-        yPos := A_ScreenHeight - height - 5
+        mon := SysGet("MonitorWorkArea")
+        xPos := mon.Right - width - 5
+        yPos := mon.Bottom - height - 5
     }
 
     ; Ensure tooltip is always visible
