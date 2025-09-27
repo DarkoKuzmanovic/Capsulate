@@ -3,6 +3,65 @@
 
 ; Initialize global variables
 global CACHED_CONFIG := LoadConfiguration()
+global chordMap := CACHED_CONFIG["Chords"]
+
+ChordHandler() {
+    key := A_ThisHotkey
+    if (chordMap.Has(key)) {
+        action := chordMap[key]
+        parts := StrSplit(action, "|")
+        if (parts.Length == 2) {
+            func := parts[1]
+            param := parts[2]
+            if (func == "ConvertCase") {
+                ConvertCase(param)
+            } else {
+                ShowTooltip("Unknown action: " . action)
+            }
+        } else {
+            ShowTooltip("Invalid action format: " . action)
+        }
+    } else {
+        ShowTooltip("No chord defined for: " . key)
+    }
+}
+
+RegisterChordHotkeys() {
+    global chordMap, registeredChordHotkeys
+
+    HotIf(IsWaitingForChord)
+
+    for key in registeredChordHotkeys {
+        try {
+            Hotkey(key, "Off")
+        } catch as err {
+            Logger.Warning("Failed to unregister chord hotkey '" . key . "': " . err.Message)
+        }
+    }
+    registeredChordHotkeys := []
+
+    for key, action in chordMap {
+        chordKey := Trim(key . "")
+        if (chordKey = "") {
+            Logger.Warning("Skipping empty chord key in configuration")
+            continue
+        }
+        try {
+            Hotkey(chordKey, Func("ChordHandler"))
+            registeredChordHotkeys.Push(chordKey)
+        } catch as err {
+            Logger.Error("Failed to register chord hotkey '" . chordKey . "': " . err.Message)
+        }
+    }
+
+    HotIf()
+}
+
+IsWaitingForChord(*) {
+    global waitingForChord
+    return waitingForChord
+}
+
 global CAPS_LOCK_TIMEOUT := CACHED_CONFIG["CapsLockTimeout"]
 global DOUBLE_CLICK_COUNT := CACHED_CONFIG["DoubleClickCount"]
 global TOOLTIP_POSITION := CACHED_CONFIG["ToolTipPosition"]
@@ -10,8 +69,11 @@ global DOUBLE_CLICK_ACTION := CACHED_CONFIG["DoubleClickAction"]
 
 global capsLockPressed := false
 global waitingForChord := false
+global registeredChordHotkeys := []
 global capsLockTimer := 0
 global capsLockCount := 0
+
+RegisterChordHotkeys()
 
 ; Logger Class for Error Handling
 class Logger {
@@ -382,14 +444,6 @@ K:: {
     SetTimer () => (waitingForChord := false, ToolTip()), -2000
 }
 
-#HotIf waitingForChord
-L:: ConvertCase("lower")
-U:: ConvertCase("upper")
-C:: ConvertCase("camel")
-T:: ConvertCase("title")
-Space:: ConvertCase("trim")
-#HotIf
-
 GetSelectedText() {
     try {
         return ClipboardManager.GetSelectedText()
@@ -474,7 +528,7 @@ ShowUnifiedConfigGUI() {
     configGui := Gui(, "Capsulate Configuration")
     configGui.SetFont("s9", "Segoe UI")
 
-    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander"])
+    tabs := configGui.Add("Tab3", "w400 h400", ["General", "Text Expander", "Chords"])
 
     tabs.UseTab(1)
     configGui.Add("Text", "x20 y40 w150", "Caps Lock Timeout:")
@@ -498,6 +552,16 @@ ShowUnifiedConfigGUI() {
     configGui.Add("Button", "x20 y340 w100", "Add/Update").OnEvent("Click", (*) => SaveExpansion(abbrevEdit,
         expansionEdit, lv))
     configGui.Add("Button", "x130 y340 w100", "Delete").OnEvent("Click", (*) => DeleteExpansion(lv))
+
+    tabs.UseTab(3)
+    configGui.Add("Text", "x20 y40", "Key:")
+    chordKeyEdit := configGui.Add("Edit", "x20 y60 w100")
+    configGui.Add("Text", "x20 y90", "Action:")
+    chordActionEdit := configGui.Add("Edit", "x20 y110 w200")
+    chordLv := configGui.Add("ListView", "x20 y140 w360 h150", ["Key", "Action"])
+    PopulateChordsList(chordLv)
+    configGui.Add("Button", "x20 y300 w100", "Add/Update").OnEvent("Click", (*) => SaveChord(chordKeyEdit, chordActionEdit, chordLv))
+    configGui.Add("Button", "x130 y300 w100", "Delete").OnEvent("Click", (*) => DeleteChord(chordLv))
 
     tabs.UseTab()
     configGui.Add("Button", "x20 y410 w100", "Save").OnEvent("Click", (*) => SaveUnifiedConfig(configGui, timeoutEdit,
@@ -546,9 +610,16 @@ SaveUnifiedConfig(configGui, timeoutEdit, doubleClickCountEdit, tooltipPositionD
     IniWrite(CACHED_CONFIG["ToolTipPosition"], configFile, "General", "ToolTipPosition")
     IniWrite(CACHED_CONFIG["DoubleClickAction"], configFile, "General", "DoubleClickAction")
 
+    ; Save chords
+    IniDelete(configFile, "Chords")
+    for key, action in chordMap {
+        IniWrite(action, configFile, "Chords", key)
+    }
+
     ; BUG FIX: This loop was redundant as it reads and rewrites the same values.
     ; It has been removed.
 
+    RegisterChordHotkeys()
     configGui.Destroy()
     ShowTooltip("Configuration saved successfully!")
 }
@@ -563,7 +634,7 @@ PopulateExpansionsList(lv) {
             if (eqPos > 0) {
                 abbrev := SubStr(A_LoopField, 1, eqPos - 1)
                 expansion := SubStr(A_LoopField, eqPos + 1)
-                lv.Add(abbrev, expansion)
+                lv.Add("", abbrev, expansion)
             }
         }
     }
@@ -590,6 +661,37 @@ DeleteExpansion(lv) {
     }
 }
 
+PopulateChordsList(lv) {
+    lv.Delete()
+    for key, action in chordMap {
+        lv.Add("", key, action)
+    }
+}
+
+SaveChord(keyEdit, actionEdit, lv) {
+    key := keyEdit.Value
+    action := actionEdit.Value
+    if (key != "" and action != "") {
+        chordMap[key] := action
+        PopulateChordsList(lv)
+        RegisterChordHotkeys()
+        MsgBox "Chord saved successfully!"
+    } else {
+        MsgBox "Please enter both key and action."
+    }
+}
+
+DeleteChord(lv) {
+    if (row := lv.GetNext()) {
+        key := lv.GetText(row, 1)
+        chordMap.Delete(key)
+        lv.Delete(row)
+        RegisterChordHotkeys()
+    } else {
+        MsgBox "Please select a chord to delete."
+    }
+}
+
 LoadConfiguration() {
     try {
         configFile := A_ScriptDir . "\config.ini"
@@ -603,6 +705,35 @@ LoadConfiguration() {
             "ToolTipPosition", IniRead(configFile, "General", "ToolTipPosition", 1),
             "DoubleClickAction", IniRead(configFile, "General", "DoubleClickAction", "{Esc}")
         )
+
+        ; Load chords
+        chords := Map(
+            "L", "ConvertCase|lower",
+            "U", "ConvertCase|upper",
+            "C", "ConvertCase|camel",
+            "T", "ConvertCase|title",
+            "Space", "ConvertCase|trim"
+        )
+        try {
+            chordData := IniRead(configFile, "Chords", , "")
+            if (chordData != "") {
+                loop parse, chordData, "`n", "`r" {
+                    line := Trim(A_LoopField)
+                    if (line = "" || SubStr(line, 1, 1) = ";")
+                        continue
+                    separatorPos := InStr(line, "=")
+                    if (separatorPos = 0)
+                        continue
+                    key := Trim(SubStr(line, 1, separatorPos - 1))
+                    action := Trim(SubStr(line, separatorPos + 1))
+                    if (key != "" && action != "")
+                        chords[key] := action
+                }
+            }
+        } catch as err {
+            Logger.Warning("Failed to load chords from configuration: " . err.Message)
+        }
+        config["Chords"] := chords
 
         ; Validate configuration
         ValidationResult := ConfigValidator.Validate(config)
@@ -639,6 +770,13 @@ CreateDefaultConfig(configFile) {
     DoubleClickCount=2
     ToolTipPosition=1
     DoubleClickAction={Esc}
+
+    [Chords]
+    L=ConvertCase|lower
+    U=ConvertCase|upper
+    C=ConvertCase|camel
+    T=ConvertCase|title
+    Space=ConvertCase|trim
 
     )",
         configFile
